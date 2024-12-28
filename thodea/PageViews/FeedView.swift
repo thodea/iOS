@@ -6,7 +6,8 @@
 //
 
 import SwiftUI
-
+import Firebase
+import FirebaseFirestore
 
 struct FeedView: View {
     var body: some View {
@@ -34,8 +35,32 @@ struct FeedView: View {
             mostFollowedLabel()
             
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // Ensure the ScrollView covers the full scree
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            getName { name in
+                
+            }
+        }// Ensure the ScrollView covers the full scree
         //.border(Color.red, width: 2) // To see the frame edges clearly
+    }
+    func getName(completion: @escaping (_ username: String?) -> Void) {
+        let docRef = Firestore.firestore().collection("user").document("him")
+
+        docRef.getDocument { (document, error) in
+            if let document = document, document.exists {
+                // Access the document data as a dictionary
+                if let data = document.data(), let username = data["username"] as? String {
+                    print("Username: \(username)")
+                    completion(username) // Pass the username to the completion handler
+                } else {
+                    print("Username not found in document")
+                    completion(nil)
+                }
+            } else {
+                print("Document does not exist or an error occurred: \(error?.localizedDescription ?? "Unknown error")")
+                completion(nil)
+            }
+        }
     }
 }
 
@@ -114,3 +139,4 @@ struct mostFollowedLabel: View {
             .shadow(color: Color.black, radius: 4, x: 0, y: 2) // Shadow effect
     }
 }
+
