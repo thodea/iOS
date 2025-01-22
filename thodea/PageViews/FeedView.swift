@@ -10,6 +10,11 @@ import Firebase
 import FirebaseFirestore
 
 struct FeedView: View {
+
+    /*init() {
+
+     }*/
+
     var body: some View {
         ScrollView { // Wrap the content in a ScrollView
             
@@ -30,20 +35,21 @@ struct FeedView: View {
                     .shadow(color: Color.black.opacity(1), radius: 4, x: 0, y: 1)
             }
             
+            ThoughtView(thought: mockThought)
+            
+            //Text(\(username))
+            
             monthlyLovedLabel()
             
             mostFollowedLabel()
             
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            getName { name in
-                
-            }
-        }// Ensure the ScrollView covers the full scree
+        // Ensure the ScrollView covers the full scree
         //.border(Color.red, width: 2) // To see the frame edges clearly
     }
-    func getName(completion: @escaping (_ username: String?) -> Void) {
+    
+    /*func getName(completion: @escaping (_ username: String?) -> Void) {
         let docRef = Firestore.firestore().collection("user").document("him")
 
         docRef.getDocument { (document, error) in
@@ -61,7 +67,7 @@ struct FeedView: View {
                 completion(nil)
             }
         }
-    }
+    }*/
 }
 
 struct FeedView_Previews: PreviewProvider {

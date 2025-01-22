@@ -18,6 +18,8 @@ import WebKit
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var userCount: Int = 0 // Track selected tab
+    @State private var showSafariView = false
+    @State private var selectedURL: URL?
 
     
     var body: some View {
@@ -68,23 +70,44 @@ struct SettingsView: View {
                 Spacer()
 
                 // Terms of Service and Privacy Policy Links
-                HStack(spacing: 8) {
-                    NavigationLink(destination: WebView(url: URL(string: "https://thodea.com/policy/terms")!)) {
-                                           Text("Terms")
-                                               .foregroundColor(.blue)
-                                       }
+                HStack(spacing: 16) {
 
-                   NavigationLink(destination: WebView(url: URL(string: "https://thodea.com/policy/privacy")!)) {
-                       Text("Privacy")
-                           .foregroundColor(.blue)
-                   }
+                   Text("Terms")
+                        .onTapGesture {
+                            selectedURL = URL(string: "https://thodea.com/policy/terms")
+                            showSafariView = true
+                        }
+                        .sheet(isPresented: $showSafariView) {
+                                    if let url = selectedURL {
+                                        FullScreenModalView(url: url)
+                                    } else {
+                                        Text("Invalid URL")
+                                    }
+                                }
+                       .foregroundColor(.blue)
+                                        
+                    Text("Privacy")
+                        .onTapGesture {
+                            selectedURL = URL(string: "https://thodea.com/policy/privacy")
+                            showSafariView = true
+                        }
+                        .sheet(isPresented: $showSafariView) {
+                                    if let url = selectedURL {
+                                        FullScreenModalView(url: url)
+                                    } else {
+                                        Text("Invalid URL")
+                                    }
+                                }
+                        .foregroundColor(.blue)
 
                 }
+                
                 .font(.system(size: 20))
                 .frame(maxWidth: .infinity, alignment: .center)
                 //.border(.green, width: 2)
                 
             }
+            .onChange(of: selectedURL) { newURL in }
             .padding()
             .frame(maxWidth: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
             .foregroundColor(.white.opacity(0.9))
@@ -134,12 +157,55 @@ struct WebView: UIViewRepresentable {
     let url: URL
 
     func makeUIView(context: Context) -> WKWebView {
-        return WKWebView()
+        let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator // Set the navigation delegate
+        webView.isOpaque = true // Allow transparency
+        webView.scrollView.backgroundColor = .clear
+        return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        let request = URLRequest(url: url)
-        uiView.load(request)
+        var urlString = url.absoluteString
+        if !urlString.hasPrefix("http://") && !urlString.hasPrefix("https://") {
+            urlString = "https://" + urlString
+        }
+        if let validURL = URL(string: urlString) {
+            let request = URLRequest(url: validURL)
+            uiView.load(request)
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        private var spinner: UIActivityIndicatorView?
+
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            // Show spinner when the page starts loading
+            if spinner == nil {
+                spinner = UIActivityIndicatorView(style: .large)
+                spinner?.color = UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1) // Set custom color
+                spinner?.center = webView.center
+                spinner?.startAnimating()
+                webView.addSubview(spinner!)
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // Hide spinner when the page finishes loading
+            spinner?.stopAnimating()
+            spinner?.removeFromSuperview()
+            spinner = nil
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            // Hide spinner if the page fails to load
+            spinner?.stopAnimating()
+            spinner?.removeFromSuperview()
+            spinner = nil
+        }
     }
 }
 

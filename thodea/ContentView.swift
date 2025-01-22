@@ -22,10 +22,11 @@ struct ContentView: View {
             .foregroundColor(.white) // Set text color to white globally
             .overlay(
                 Footer(selectedNavItem: $selectedNavItem)
+                
                     .frame(maxWidth: .infinity) // Set footer size here
                 , // Optional padding to give space between content and footer
                 alignment: .bottom
-            )
+            ).edgesIgnoringSafeArea(.bottom)
             //.border(Color.green, width: 2)
         }
     }

@@ -12,7 +12,7 @@ struct Footer: View {
                                                 .frame(width: 55, height: 55)
                                                 .padding() // Icon for post
                 }
-                .frame(maxWidth: .infinity, maxHeight: 65)
+                .frame(maxWidth: .infinity, maxHeight: 90)
                 .background(selectedNavItem == "post" ? Color.blue.opacity(0.2) : Color.clear)
             }
             Spacer()
@@ -23,7 +23,7 @@ struct Footer: View {
                                                 .frame(width: 55, height: 55)
                                                 .padding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: 65)
+                .frame(maxWidth: .infinity, maxHeight: 90)
                 .background(selectedNavItem == "feed" ? Color.blue.opacity(0.2) : Color.clear)
             }
             Spacer()
@@ -34,7 +34,7 @@ struct Footer: View {
                                                 .frame(width: 55, height: 55)
                                                 .padding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: 65)
+                .frame(maxWidth: .infinity, maxHeight: 90)
                 .background(selectedNavItem == "search" ? Color.blue.opacity(0.2) : Color.clear)
             }
             Spacer()
@@ -45,7 +45,7 @@ struct Footer: View {
                                                 .frame(width: 55, height: 55)
                                                 .padding()
                 }
-                .frame(maxWidth: .infinity, maxHeight: 65)
+                .frame(maxWidth: .infinity, maxHeight: 90)
                 .background(selectedNavItem == "profile" ? Color.blue.opacity(0.2) : Color.clear)
             }
         }
