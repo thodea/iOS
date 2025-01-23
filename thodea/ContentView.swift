@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedNavItem: String = "feed" // Track selected tab
+    @State private var selectedNavItem: String = "profile" // Track selected tab
     
     var body: some View {
         NavigationStack {

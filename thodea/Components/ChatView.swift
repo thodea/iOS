@@ -8,8 +8,8 @@
 import SwiftUI
 import SafariServices
 
-struct ThoughtView: View {
-    let thought: Thought
+struct ChatView: View {
+    let chat: Thought
     @State private var isHeartTapped = false
     @State private var heartScale: CGFloat = 1.0
     @State private var heartColor: Color = Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255)
@@ -48,7 +48,7 @@ struct ThoughtView: View {
     }
     
     var timeAgo: String {
-         if let createdAt = thought.createdAt {
+         if let createdAt = chat.createdAt {
              let timeElapsed = Int(Date().timeIntervalSince(createdAt))
              if timeElapsed < 60 {
                  return "\(timeElapsed) seconds ago"
@@ -71,7 +71,7 @@ struct ThoughtView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(){
                 if let imageURL = mockThought.imageURL {
-                    ImageView(imageURL: imageURL, size: 40);
+                    ImageView(imageURL: imageURL, size: 35).padding(.trailing, 4);
                     /*AsyncImage(url: URL(string: imageURL), transaction: Transaction(animation: .easeInOut)) { phase in
                             switch phase {
                             case .empty:
@@ -91,10 +91,10 @@ struct ThoughtView: View {
                             }
                         }*/
                 }
-                Text("\(thought.createdBy)")
-                    .font(.headline)
+                Text("\(chat.createdBy)")
+                    .font(.system(size: 20))
                     .fontWeight(.semibold)
-                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                    .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, -2)
                     /*.environment(\.openURL, OpenURLAction { url in
@@ -102,18 +102,33 @@ struct ThoughtView: View {
                             return .handled
                         })*/
                      // Add inset padding
+                Spacer()
+
+                HStack(spacing: 0){
+                
+                    Spacer()
+
+                    if chat.createdAt != nil {
+                        Text("\(timeAgo)")
+                            .italic()
+                    }
+                }
+                .font(.system(size: 16))
+                .foregroundColor(.gray)
+                .padding(.top, -2)
+
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
-            .padding(.top, 6)
+            .padding(.top, 10)
             //.border(.red, width: 2)
 
-            Text(highlightText(thought.message))
-                .font(.body)
+            Text(highlightText(chat.message))
+                .font(.system(size: 20))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
-                .lineLimit(5) // Limit to 2 lines
+                .lineLimit(1) // Limit to 2 lines
                 .truncationMode(.tail)
                 .environment(\.openURL, OpenURLAction { url in
                     // Custom action before opening URL
@@ -139,84 +154,13 @@ struct ThoughtView: View {
                     }
                     
                 }
+                .padding(.bottom, 4)
                        
                 /*.fullScreenCover(isPresented: $showSafariView) {
                     if urlToOpen != nil {
                         WebView(url: urlToOpen!).edgesIgnoringSafeArea(.all)
                     }
                 }*/
-            
-            if let firstUrl = thought.firstUrl {
-                Text("First URL: \(firstUrl)")
-                    .font(.footnote)
-                    .padding(.horizontal, 8) // Add inset padding
-            }
-            
-            HStack(spacing: 0){
-                HStack(spacing: 0) {
-                    Image(systemName: isHeartTapped ? "heart.fill" : "heart")
-                        .font(.system(size: 20))
-                        .foregroundColor(isHeartTapped ? .red : Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255)) // Set color based on tapped state
-                        .scaleEffect(heartScale) // Apply scaling effect
-                        .onTapGesture {
-                            if (!isHeartTapped) {
-                                heartScale = 1.1 // Scale up when tapped
-                                // Reset the scale after 0.5 seconds
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        heartScale = 1.0
-                                    }
-                                }
-                            }
-                            isHeartTapped.toggle() // Toggle heart tapped state
-
-                            
-                        }
-                    Text("\(formatNumber(thought.seenCount))")
-                        .font(.system(size: 16))
-                        .fontWeight(.semibold)
-                        .padding(.leading, 4)
-                }
-                HStack(spacing: 0) {
-                    Image(systemName: "text.bubble.rtl")
-                         // You can set the color to red to represent a like
-                        .font(.system(size: 20))
-                    Text("\(formatNumber(thought.commentCount))")
-                        .font(.system(size: 16))
-                        .fontWeight(.semibold)
-                        .padding(.leading, 4)
-                }.padding(.leading, 12)
-                
-            }
-            .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
-            .padding(.top, 4)
-
-            HStack(spacing: 0){
-                
-                HStack(spacing: 0) {
-                    Text("\(formatNumber(thought.seenCount))")
-                        .font(.system(size: 14))
-                    
-                    Image(systemName: "eye") // Use "eye.fill" for a filled eye icon
-                            .foregroundColor(.gray)
-                            .opacity(0.75)
-                            .font(.system(size: 13)) // Adjust the size as
-                            .padding(.leading, 4)
-                }
-            
-                Spacer()
-
-                if thought.createdAt != nil {
-                    Text("\(timeAgo)")
-                        .italic()
-                }
-            }
-            .font(.system(size: 14))
-            .foregroundColor(.gray)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 6)
            
         }
         .onChange(of: urlToOpen) { newURL in
@@ -234,7 +178,6 @@ struct ThoughtView: View {
                 .stroke(Color(red: 31/255, green: 41/255, blue: 55/255), lineWidth: 1) // Border with blue color
         )
         .foregroundColor(.white) // Apply white color to all Text views
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6) // Outer padding for the entire VStack
+        .padding(.vertical, 0) // Outer padding for the entire VStack
     }
 }

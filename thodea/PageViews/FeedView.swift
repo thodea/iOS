@@ -18,31 +18,35 @@ struct FeedView: View {
     var body: some View {
         ScrollView { // Wrap the content in a ScrollView
             
-            VStack {
-                Text("")
-            }.frame(maxHeight:1)
-            
-            VStack {
-                Text("follow to customize feed")
-                    .font(.headline) // Adjust font size and weight
-                    .padding(.leading, 8)
-                    .padding(.trailing, 8)
-                    .padding(.bottom, 2)
-                    .padding(.top, 2)
-                    .foregroundColor(Color.white.opacity(0.8))
-                    .background(Color(red: 55 / 255, green: 65 / 255, blue: 81 / 255)) // Add a background color
-                    .cornerRadius(8)
-                    .shadow(color: Color.black.opacity(1), radius: 4, x: 0, y: 1)
+            VStack(spacing: 0) {
+                
+                VStack {
+                    Text("")
+                }.frame(maxHeight:1)
+                
+                VStack {
+                    Text("follow to customize feed")
+                        .font(.headline) // Adjust font size and weight
+                        .padding(.leading, 8)
+                        .padding(.trailing, 8)
+                        .padding(.bottom, 2)
+                        .padding(.top, 2)
+                        .foregroundColor(Color.white.opacity(0.8))
+                        .background(Color(red: 55 / 255, green: 65 / 255, blue: 81 / 255)) // Add a background color
+                        .cornerRadius(8)
+                        .shadow(color: Color.black.opacity(1), radius: 4, x: 0, y: 1)
+                }.padding(.bottom, 6)
+                
+                ThoughtView(thought: mockThought)
+                //ThoughtView(thought: mockThought)
+                
+                
+                //Text(\(username))
+                
+                monthlyLovedLabel().padding(.bottom, 6).padding(.top, 6)
+                mostFollowedLabel().padding(.bottom, 6).padding(.top, 6)
+                
             }
-            
-            ThoughtView(thought: mockThought)
-            
-            //Text(\(username))
-            
-            monthlyLovedLabel()
-            
-            mostFollowedLabel()
-            
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Ensure the ScrollView covers the full scree

@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-struct ChatsView: View {
+struct ChatRequestsView: View {
     @Environment(\.presentationMode) var presentationMode
 
     
@@ -18,11 +18,8 @@ struct ChatsView: View {
                 /*HStack(){
                     Text("chats")
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8).font(.system(size: 19)).foregroundColor(.white.opacity(0.6))*/
-                                    
-                NavigationLink(destination: MessagesView()) {
-                                ChatView(chat: mockThought)
-                            }
-                
+                                
+                ChatView(chat: mockThought)
                 ChatView(chat: mockThought)
 
                 Spacer()
@@ -41,21 +38,9 @@ struct ChatsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar{
                 ToolbarItem(placement: .principal) {
-                    Text("Chats")
+                    Text("Chat requests")
                         .font(.system(size: 22))
                         .foregroundColor(.white.opacity(0.9))
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ChatRequestsView()) {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color(red: 29/255, green: 78/255, blue: 216/255))
-                            .padding(2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color(red: 29/255, green: 78/255, blue: 216/255), lineWidth: 2)
-                            )
-                    }
                 }
             }
            
@@ -65,8 +50,8 @@ struct ChatsView: View {
 }
 
 
-struct ChatsView_Previews: PreviewProvider {
+struct ChatRequestsView_Previews: PreviewProvider {
     static var previews: some View {
-        ChatsView()
+        ChatRequestsView()
     }
 }

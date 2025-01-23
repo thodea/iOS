@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ImageView: View {
     let imageURL: String
+    let size: CGFloat  // Parameter to control size
     @State private var uiImage: UIImage? = nil
     @State private var isLoading = true
     
@@ -15,11 +16,13 @@ struct ImageView: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 20, height: 20)
+                    .frame(width: size, height: size)  // Use the size parameter
                     .clipShape(RoundedRectangle(cornerRadius: 5))
             } else {
                 Image(systemName: "photo")
-                    .frame(width: 40, height: 40)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)  // Default image with the same size
                     .foregroundColor(.gray)
             }
         }
