@@ -39,12 +39,12 @@ struct User {
     var isCurrentUser: Bool = false
 }
 
-struct Message {
-    var id = UUID() // This will generate a unique identifier for each message
-    var content: String
-    var user: User
+struct Message: Identifiable {
+    let id = UUID()
+    let content: String
+    let user: User
+    let createdAt: Date
 }
-
 
 let mockThought = Thought(
     createdAt: Date(timeIntervalSince1970: 1734296943), // Converted from "December 14, 2024 at 11:49:03 AM UTC-5"
