@@ -10,18 +10,17 @@ import SwiftUI
 
 struct MessagesView: View {
     @Environment(\.presentationMode) var presentationMode
+    @StateObject var chatHelper = ChatHelper()
 
     
     var body: some View {
         VStack(spacing: 16) {
-            
-            Text("logic")
-
-            Spacer()
-
+            UserChatView().environmentObject(chatHelper)
         }
-        .padding()
-        .frame(maxWidth: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
+        //.border(.green, width: 2)
+        //.edgesIgnoringSafeArea(.bottom)
+        .padding(0)
+        .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
         .foregroundColor(.white.opacity(0.9))
         .navigationBarBackButtonHidden(true) // Hides the default back button
             .navigationBarItems(leading: Button(action: {

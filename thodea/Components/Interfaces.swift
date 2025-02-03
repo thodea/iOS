@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AVKit
 
 struct Thought: Identifiable {
     let id = UUID() // Optional unique identifier for SwiftUI's List or ForEach
@@ -31,6 +32,19 @@ struct Thought: Identifiable {
     var firstUrl: String?
     var profileDeleted: Bool?
 }
+
+struct User {
+    var username: String
+    var image: UIImage
+    var isCurrentUser: Bool = false
+}
+
+struct Message {
+    var id = UUID() // This will generate a unique identifier for each message
+    var content: String
+    var user: User
+}
+
 
 let mockThought = Thought(
     createdAt: Date(timeIntervalSince1970: 1734296943), // Converted from "December 14, 2024 at 11:49:03 AM UTC-5"

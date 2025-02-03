@@ -131,11 +131,6 @@ struct PostView: View {
     }
 }
 
-struct User {
-    var username: String
-    var image: UIImage
-}
-
 
 struct PostView_Previews: PreviewProvider {
     @State static var previewNavItem = "feed" // Add a State variable for the preview
