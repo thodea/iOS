@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedNavItem: String = "profile" // Track selected tab
+    @State private var selectedNavItem: String = "login" // Track selected tab
     
     var body: some View {
         NavigationStack {
@@ -10,6 +10,7 @@ struct ContentView: View {
                 if selectedNavItem == "feed" {FeedView()}
                 if selectedNavItem == "search" {SearchView()}
                 if selectedNavItem == "profile" {ProfileView()}
+                if selectedNavItem == "login" {LoginView()}
                 //if selectedNavItem == "settings" {SettingsView()}
 
                 // Content view without tab items
