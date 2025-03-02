@@ -13,7 +13,7 @@ struct FullScreenModalView: View {
     @Environment(\.dismiss) var dismiss
     let url: URL
     @State private var isLoading = true
-
+    
     var body: some View {
         ZStack {
             WebView(url: url)

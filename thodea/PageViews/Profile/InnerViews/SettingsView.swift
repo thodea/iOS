@@ -83,7 +83,7 @@ struct SettingsView: View {
                                     } else {
                                         Text("Invalid URL")
                                     }
-                                }
+                                } 
                        .foregroundColor(.blue)
                                         
                     Text("Privacy")

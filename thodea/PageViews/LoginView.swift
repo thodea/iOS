@@ -13,7 +13,8 @@ struct LoginView: View {
     @State private var email: String = ""
     @State private var emailCopy: String = ""
     @State private var emailSent: Bool = false
-    @State private var showSafariView = false
+    @State private var showTermsSheet = false
+    @State private var showPrivacySheet = false
     @State private var selectedURL: URL?
     @State private var isError: Bool = false
     @State private var errorMessage: String = ""
@@ -117,14 +118,10 @@ struct LoginView: View {
                         Text("Terms of Use")
                             .onTapGesture {
                                 selectedURL = URL(string: "https://thodea.com/policy/terms")
-                                showSafariView = true
+                                showTermsSheet = true 
                             }
-                            .sheet(isPresented: $showSafariView) {
-                                if let url = selectedURL {
-                                    FullScreenModalView(url: url)
-                                } else {
-                                    Text("Invalid URL")
-                                }
+                            .sheet(isPresented: $showTermsSheet) {
+                                FullScreenModalView(url: URL(string: "https://thodea.com/policy/terms")!)
                             }
                             .foregroundColor(.blue)
                         Text("and").foregroundColor(.gray)                                .font(.system(size: 18))
@@ -132,14 +129,10 @@ struct LoginView: View {
                         Text("Privacy Policy")
                             .onTapGesture {
                                 selectedURL = URL(string: "https://thodea.com/policy/privacy")
-                                showSafariView = true
+                                showPrivacySheet = true
                             }
-                            .sheet(isPresented: $showSafariView) {
-                                if let url = selectedURL {
-                                    FullScreenModalView(url: url)
-                                } else {
-                                    Text("Invalid URL")
-                                }
+                            .sheet(isPresented: $showPrivacySheet) {
+                                FullScreenModalView(url: URL(string: "https://thodea.com/policy/privacy")!)
                             }
                             .foregroundColor(.blue)
                     }
