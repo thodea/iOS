@@ -1,2 +1,28 @@
 # Ignore the Firebase configuration file
 thodea/GoogleService-Info.plist
+# Xcode
+DerivedData/
+build/
+*.xcworkspace
+xcuserdata/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+Packages/
+.swiftpm/xcode/package.xcworkspace/
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Carthage
+Carthage/
+
+# Firebase config
+**/GoogleService-Info.plist
+
+# Secrets
+*.env

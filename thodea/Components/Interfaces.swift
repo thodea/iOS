@@ -48,7 +48,7 @@ struct Message: Identifiable {
 
 let mockThought = Thought(
     createdAt: Date(timeIntervalSince1970: 1734296943), // Converted from "December 14, 2024 at 11:49:03 AM UTC-5"
-    createdBy: "tatyanapev",
+    createdBy: "nik",
     message: "It doesn’t help thodea.com that a billionaire google.com buys a social network. Now billionaires are managing all social networks, each one their own. Regular population will find it hard to relate themselves with the owners of social network, even Facebook is more of Ivy League story than a normal human can imagine how to pass through admissions. Do people use social networks to connect with their friends or it’s just another news channel for a few to be heard? It’s hard to imagine that a regular person is thinking same thing as these billionaires who have enormous power over population.",
     postId: -6,
     loved: true,
@@ -58,7 +58,7 @@ let mockThought = Thought(
     seenCount: 3,
     clickCount: 0,
     mentions: [], // Empty array
-    imageURL: "https://storage.googleapis.com/thodea_assets/user/tatyanapev/asset_1732782978345_min.webp",
+    imageURL: "https://storage.googleapis.com/thodea_assets/user/nik/asset_1732579544022.webp",
     assetUrl: "https://storage.googleapis.com/thodea_assets/thoughts/-6/asset.jpg",
     assetType: "image/webp",
     posterUrl: "", // No posterUrl provided

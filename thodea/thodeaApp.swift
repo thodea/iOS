@@ -23,8 +23,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
                 }
             }
         }
-        //FirebaseApp.configure()
-
+        FirebaseApp.configure()
+            
         return true
     }
 }
@@ -32,9 +32,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 @main
 struct thodeaApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @StateObject var viewModel = AuthViewModel()
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(viewModel)
         }
     }
 }

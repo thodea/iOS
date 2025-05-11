@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedNavItem: String = "login" // Track selected tab
+    @State private var selectedNavItem: String = "feed" // Track selected tab
     
     var body: some View {
         NavigationStack {
@@ -22,11 +22,13 @@ struct ContentView: View {
             .background(Color(red: 17/255, green: 24/255, blue: 39/255))
             .foregroundColor(.white) // Set text color to white globally
             .overlay(
-                Footer(selectedNavItem: $selectedNavItem)
-                
-                    .frame(maxWidth: .infinity) // Set footer size here
-                , // Optional padding to give space between content and footer
-                alignment: .bottom
+                Group {
+                        if selectedNavItem != "login" {
+                            Footer(selectedNavItem: $selectedNavItem)
+                                .frame(maxWidth: .infinity)
+                        }
+                    },
+                    alignment: .bottom
             ).edgesIgnoringSafeArea(.bottom)
             //.border(Color.green, width: 2)
         }

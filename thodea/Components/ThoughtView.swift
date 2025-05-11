@@ -71,7 +71,7 @@ struct ThoughtView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(){
                 if let imageURL = mockThought.imageURL {
-                    ImageView(imageURL: imageURL, size: 40);
+                    ImageView(imageURL: imageURL, size: 24);
                     /*AsyncImage(url: URL(string: imageURL), transaction: Transaction(animation: .easeInOut)) { phase in
                             switch phase {
                             case .empty:
