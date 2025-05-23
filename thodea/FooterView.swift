@@ -7,52 +7,70 @@ struct Footer: View {
         HStack {
             // Post button
             Button(action: { selectedNavItem = "post" }) {
-                VStack {
+                HStack {
                     PostIcon(selected: selectedNavItem == "post")
-                                                .frame(width: 55, height: 55)
-                                                .padding() // Icon for post
+                        .frame(width: 55, height: 55) // Make sure the icon is small enough
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 90)
-                .background(selectedNavItem == "post" ? Color.blue.opacity(0.2) : Color.clear)
+                .background(
+                    selectedNavItem == "post" ? Color.blue.opacity(0.2) : Color.clear
+                )
+                .clipShape(Capsule())
+                .opacity(0.5) // Optional to mimic `opacity-50`
             }
             Spacer()
             // Feed button
             Button(action: { selectedNavItem = "feed" }) {
-                VStack {
+                HStack {
                     FeedIcon(selected: selectedNavItem == "feed")
-                                                .frame(width: 55, height: 55)
-                                                .padding()
+                        .frame(width: 55, height: 55) // Make sure the icon is small enough
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 90)
-                .background(selectedNavItem == "feed" ? Color.blue.opacity(0.2) : Color.clear)
+                .background(
+                    selectedNavItem == "feed" ? Color.blue.opacity(0.2) : Color.clear
+                )
+                .clipShape(Capsule())
+                .opacity(0.5) // Optional to mimic `opacity-50`
             }
             Spacer()
             // Search button
             Button(action: { selectedNavItem = "search" }) {
-                VStack {
+                HStack {
                     SearchIcon(selected: selectedNavItem == "search")
-                                                .frame(width: 55, height: 55)
-                                                .padding()
+                        .frame(width: 55, height: 55) // Make sure the icon is small enough
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 90)
-                .background(selectedNavItem == "search" ? Color.blue.opacity(0.2) : Color.clear)
+                .background(
+                    selectedNavItem == "search" ? Color.blue.opacity(0.2) : Color.clear
+                )
+                .clipShape(Capsule())
+                .opacity(0.5) // Optional to mimic `opacity-50`
             }
             Spacer()
             // Profile button
             Button(action: { selectedNavItem = "profile" }) {
-                VStack {
+                HStack {
                     ProfileIcon(selected: selectedNavItem == "profile")
-                                                .frame(width: 55, height: 55)
-                                                .padding()
+                        .frame(width: 55, height: 55) // Make sure the icon is small enough
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 2)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 90)
-                .background(selectedNavItem == "profile" ? Color.blue.opacity(0.2) : Color.clear)
+                .background(
+                    selectedNavItem == "profile" ? Color.blue.opacity(0.2) : Color.clear
+                )
+                .clipShape(Capsule())
+                .opacity(0.5) // Optional to mimic `opacity-50`
             }
         }
         .frame(maxWidth: .infinity)
-        .background(Color.blue.opacity(0.1))
+        .background(Color.clear)
         .cornerRadius(0)
         .shadow(radius: 5)
+        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
         //.border(Color.green, width: 2)
     }
 }
