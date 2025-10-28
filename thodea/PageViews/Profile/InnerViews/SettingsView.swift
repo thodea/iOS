@@ -17,6 +17,7 @@ import WebKit
 
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
+    @EnvironmentObject var authViewModel: AuthViewModel // Add this
     @State private var userCount: Int = 0 // Track selected tab
     @State private var showSafariView = false
     @State private var selectedURL: URL?
@@ -31,6 +32,8 @@ struct SettingsView: View {
                 HStack {
                     Button(action: {
                         // Add your "LOG OUT" button action here
+                        authViewModel.signOut()
+                        presentationMode.wrappedValue.dismiss()
                         print("LOG OUT tapped")
                     }) {
                         Text("LOG OUT")
