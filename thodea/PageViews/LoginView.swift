@@ -8,6 +8,8 @@
 
 import SwiftUI
 import WebKit
+import GoogleSignIn
+import GoogleSignInSwift
 
 struct LoginView: View {
     @State private var email: String = ""
@@ -155,7 +157,16 @@ struct LoginView: View {
     
     
     func signIn(provider: String) {
-        //print("Sign in with \(provider)")
+        print("Sign in with \(provider)")
+            
+        switch provider.lowercased() {
+        case "google":
+            Task {
+                await viewModel.signInWithGoogle()
+            }
+        default:
+            print("❌ Unsupported provider:", provider)
+        }
     }
     
     
