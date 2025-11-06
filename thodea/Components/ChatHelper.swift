@@ -14,8 +14,36 @@ class ChatHelper: ObservableObject {
     
     init() {
          let mockUsers = [
-             User(username: "Alice", image: UIImage(), isCurrentUser: false),
-             User(username: "Bob", image: UIImage(), isCurrentUser: true)
+            User(
+                username: "Alice",
+                followers: 120,
+                followings: 85,
+                thoughts: 42,
+                chatRequest: false,
+                newChat: true,
+                bio: "Lover of coffee and code ☕️",
+                registeredAt: Date(), // current date
+                darkMode: true,
+                following: ["bob", "charlie", "diana"],
+                profileUrl: "https://example.com/images/alice.jpg",
+                profileMiniUrl: "https://example.com/images/alice-mini.jpg",
+                deleted: false
+            ),
+            User(
+                username: "Bob",
+                followers: 200,
+                followings: 150,
+                thoughts: 30,
+                chatRequest: false,
+                newChat: true,
+                bio: "Just a regular Bob.",
+                registeredAt: Date(),
+                darkMode: true,
+                following: ["Alice", "Charlie"],
+                profileUrl: "https://example.com/images/bob.jpg",
+                profileMiniUrl: "https://example.com/images/bob-mini.jpg",
+                deleted: false
+            )
          ]
 
          realTimeMessages = (1...15).map { i in
@@ -31,7 +59,12 @@ class ChatHelper: ObservableObject {
     func sendMessage(_ content: String) {
         guard !content.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         
-        let currentUser = User(username: "Me", image: UIImage(), isCurrentUser: true)
+        let currentUser = User(
+                username: "Me",
+                registeredAt: Date(),
+                darkMode: true,
+                profileUrl: "https://example.com/images/me.jpg"
+            )
         let newMessage = Message(content: content, user: currentUser, createdAt: Date())
         
         realTimeMessages.append(newMessage)

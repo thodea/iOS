@@ -9,26 +9,44 @@ struct ContentView: View {
             VStack {
                 // Show appropriate view based on auth state
                 if authViewModel.userSession != nil {
-                    // User is logged in - show main app
-                    if selectedNavItem == "post" { PostView(selectedNavItem: $selectedNavItem) }
-                    if selectedNavItem == "feed" { FeedView() }
-                    if selectedNavItem == "search" { SearchView() }
-                    if selectedNavItem == "profile" { ProfileView() }
+                    
+                    if authViewModel.layerOneLoaded == false  {
+                        LoginView(isSigningIn: true) // show with loaderview instead
+                    } else {
+                        if authViewModel.userExistsInFirestore == false {
+                            // ISSUE: when user exists in Firestore, this flushes before Feed
+                            SetupView()
+                        } else {
+                            if authViewModel.isLoadingUser {
+                                Loader()
+                            } else {
+                                switch selectedNavItem {
+                                case "post": PostView(selectedNavItem: $selectedNavItem)
+                                case "feed": FeedView()
+                                case "search": SearchView()
+                                case "profile": ProfileView()
+                                default: FeedView()
+                                }
+                            }
+                        }
+                    }
+                   
+                    
                 } else {
-                    // User is not logged in - show login
-                    LoginView()
+                    LoginView(isSigningIn: false)
                 }
                 
                 Spacer()
                 
                 // Show footer only when logged in
-                if authViewModel.userSession != nil {
+                if authViewModel.currentUser != nil {
                     Footer(selectedNavItem: $selectedNavItem)
                         .frame(maxWidth: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(red: 17/255, green: 24/255, blue: 39/255))
+            .ignoresSafeArea(.all, edges: .bottom)
             .foregroundColor(.white)
             .onAppear {
                 // Automatically show feed when user is logged in

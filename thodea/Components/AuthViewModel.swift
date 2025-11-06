@@ -10,13 +10,33 @@ import FirebaseAuth
 import GoogleSignIn
 import GoogleSignInSwift
 import FirebaseCore
+import FirebaseFirestore
+import SwiftUI
 
 class AuthViewModel: ObservableObject {
     @Published var userSession: FirebaseAuth.User?
     @Published var currentUser: User?
+    @Published var isLoadingUser: Bool = true
+    @Published var layerOneLoaded: Bool = false
+    @AppStorage("user_exists_in_firestore") var userExistsInFirestore: Bool?
     
     init() {
-       self.userSession = Auth.auth().currentUser
+        self.userSession = Auth.auth().currentUser
+        
+        // Check if userExistsInFirestore has been defined (is not nil)
+        if self.userExistsInFirestore != nil {
+            // If it's defined (i.e., a value has been set previously)
+            self.layerOneLoaded = true
+        } else {
+            // It's nil (undefined), so layerOneLoaded remains false
+            self.layerOneLoaded = false
+        }
+    
+        if self.userSession != nil  && self.userExistsInFirestore == true {
+            Task {
+                await loadUserSession()
+            }
+        }
     }
     
     func singIn(withEmail email: String, link: String) async throws {
@@ -69,14 +89,38 @@ class AuthViewModel: ObservableObject {
             let user = authResult.user
             self.userSession = user
             
+            // 🔍 Check Firestore for existing user document
+            if let email = user.email {
+                let (userInfo, username) = await fetchUserDataByEmail(email)
+                if let userInfo = userInfo {
+                    // Safely extract registeredAt from userInfo
+                    let registeredAt = userInfo["registeredAt"] as? Timestamp
+                    let date = registeredAt?.dateValue() ?? Date() // fallback to current date if missing
+
+                    self.currentUser = User(
+                        username: username ?? "",
+                        registeredAt: date,
+                        darkMode: true
+                    )
+                    
+                    self.userExistsInFirestore = true
+                    self.isLoadingUser = false
+                } else {
+                    // User does not exist in Firestore — navigate to Setup
+                    self.userExistsInFirestore = false
+                    self.currentUser = nil
+                }
+                self.layerOneLoaded = true
+            }
+    
             //print("✅ Google Sign-In successful for \(user.email ?? "unknown user")")
             
             // Equivalent of your Next.js loginData
-            let loginData: [String: Any] = [
+            /*let loginData: [String: Any] = [
                 "uidData": user.uid,
                 "emailData": user.email ?? "",
                 "createdAtDate": Date()
-            ]
+            ]*/
             
             //print("📦 Login Data:", loginData)
             
@@ -84,6 +128,54 @@ class AuthViewModel: ObservableObject {
             print("❌ Google Sign-In failed:", error.localizedDescription)
         }
     }
+    
+    @MainActor
+    func loadUserSession() async {
+        guard let user = Auth.auth().currentUser else {
+            self.userExistsInFirestore = false
+            self.isLoadingUser = false
+            return
+        }
+
+        self.userSession = user
+
+        if let email = user.email {
+            let (userInfo, username) = await fetchUserDataByEmail(email)
+            if let userInfo = userInfo {
+                let registeredAt = userInfo["registeredAt"] as? Timestamp
+                let date = registeredAt?.dateValue() ?? Date()
+
+                self.currentUser = User(
+                    username: username ?? "",
+                    registeredAt: date,
+                    darkMode: true
+                )
+
+            }
+        }
+
+        self.isLoadingUser = false
+    }
+    
+    func fetchUserDataByEmail(_ email: String) async -> (userInfo: [String: Any]?, username: String?) {
+            let db = Firestore.firestore()
+            let userRef = db.collection("user")
+            let query = userRef.whereField("email", isEqualTo: email)
+
+            do {
+                let snapshot = try await query.getDocuments()
+                if let document = snapshot.documents.first {
+                    let data = document.data()
+                    let username = document.documentID
+                    return (data, username)
+                } else {
+                    return (nil, nil)
+                }
+            } catch {
+                print("❌ Error fetching user data: \(error.localizedDescription)")
+                return (nil, nil)
+            }
+        }
     
     func createUser(withEmail email: String, fullname: String) async throws {
         
@@ -93,6 +185,9 @@ class AuthViewModel: ObservableObject {
         do {
             try Auth.auth().signOut()
             self.userSession = nil
+            self.currentUser = nil
+            self.userExistsInFirestore = nil
+            self.layerOneLoaded = false
             print("✅ Signed out successfully")
         } catch {
             print("❌ Error signing out:", error.localizedDescription)

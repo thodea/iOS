@@ -17,7 +17,9 @@ struct SetupView: View {
     @State private var selectedURL: URL?
     @State private var isError: Bool = false
     @State private var errorMessage: String = ""
-        
+    @EnvironmentObject var authViewModel: AuthViewModel // Add this
+    @Environment(\.presentationMode) var presentationMode
+
     var body: some View {
         Color(red: 17/255, green: 24/255, blue: 39/255)
         .ignoresSafeArea()
@@ -26,10 +28,17 @@ struct SetupView: View {
                 HStack() {
                     Text("Set username").font(.system(size: 26)).foregroundColor(.white.opacity(0.8))
                     Spacer()
-                    Image(systemName: "arrow.left.to.line.square") // Replace with a similar SF Symbol
-                        .resizable()
-                        .frame(width: 26, height: 26)
-                        .foregroundColor(Color(red: 37/255, green: 99/255, blue: 235/255))
+                    Button(action: {
+                        // LOG OUT action
+                        authViewModel.signOut()
+                        presentationMode.wrappedValue.dismiss()
+                        print("LOG OUT tapped")
+                    }) {
+                        Image(systemName: "arrow.left.to.line.square")
+                            .resizable()
+                            .frame(width: 26, height: 26)
+                            .foregroundColor(Color(red: 37/255, green: 99/255, blue: 235/255))
+                    }
                 }.padding(.horizontal)
                 VStack() {
                     TextField(

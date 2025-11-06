@@ -69,7 +69,7 @@ struct Footer: View {
         .background(Color.clear)
         .cornerRadius(0)
         .shadow(radius: 5)
-        .padding(.bottom, 16)
+        //.padding(.bottom, 4)
         .padding(.horizontal, 16)
         //.border(Color.green, width: 2)
     }
