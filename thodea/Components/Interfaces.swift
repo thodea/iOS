@@ -35,8 +35,20 @@ struct Thought: Identifiable {
 
 struct User {
     var username: String
-    var image: UIImage
-    var isCurrentUser: Bool = false
+    var followers: Int?
+    var followings: Int?
+    var thoughts: Int?
+    var chatRequest: Bool?
+    var newChat: Bool?
+    var bio: String?
+    var registeredAt: Date
+    var darkMode: Bool
+    var following: [String]?
+    var profileUrl: String?
+    var profileMiniUrl: String?
+    var deleted: Bool?
+    // var lastChecked
+    // var seen
 }
 
 struct Message: Identifiable {
