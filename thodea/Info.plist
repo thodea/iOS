@@ -12,6 +12,14 @@
 				<string>com.googleusercontent.apps.873669466528-dev781t1j7c51cve78evukbems9j7t68</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-873669466528-ios-3afa20ad39b5443dd36cc5</string>
+			</array>
+		</dict>
 	</array>
 	<key>GIDClientID</key>
 	<string>873669466528-dev781t1j7c51cve78evukbems9j7t68.apps.googleusercontent.com</string>

@@ -9,44 +9,24 @@
 import SwiftUI
 import SafariServices
 
-struct FullScreenModalView: View {
-    @Environment(\.dismiss) var dismiss
+struct FullScreenModalView: UIViewControllerRepresentable {
     let url: URL
-    @State private var isLoading = true
-    
-    var body: some View {
-        ZStack {
-            WebView(url: url)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                   .edgesIgnoringSafeArea(.bottom) // Make the web view full-screen
-                   .background(.white)
-                   .onAppear {
-                       DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                           self.isLoading = false
-                       }
-                   }
-               
-               // Dismiss button overlay
-               VStack {
-                   Spacer()
-                   Button(action: {
-                       dismiss()
-                   }) {
-                       Text("Go Back")
-                           .padding()
-                           .background(Color.black.opacity(0.7))
-                           .foregroundColor(.white)
-                           .cornerRadius(8)
-                           .padding(.bottom, 30)
-                   }
-               }
-        }
-        /*.onAppear {
-            // Print the URL when the view appears
-            print("URL: \(url)")
-        }*/
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.white)
-        .edgesIgnoringSafeArea(.bottom)
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let safariViewController = SFSafariViewController(url: url)
+        let vibrantBlue = UIColor(
+            red: 0/255.0,     // Red component (0-255)
+            green: 122/255.0, // Green component
+            blue: 255/255.0,  // Blue component
+            alpha: 1.0        // Opacity
+        )
+
+        // Apply the vibrant color to the controls
+        safariViewController.preferredControlTintColor = vibrantBlue
+        return safariViewController
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {
+        // No updates needed
     }
 }
