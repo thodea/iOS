@@ -22,7 +22,7 @@ class AuthViewModel: ObservableObject {
     
     init() {
         self.userSession = Auth.auth().currentUser
-        
+        print(userSession?.email as Any)
         // Check if userExistsInFirestore has been defined (is not nil)
         if self.userExistsInFirestore != nil {
             // If it's defined (i.e., a value has been set previously)
@@ -127,6 +127,107 @@ class AuthViewModel: ObservableObject {
         } catch {
             print("❌ Google Sign-In failed:", error.localizedDescription)
         }
+    }
+    
+    // MARK: - Microsoft Sign-In
+    @MainActor
+    func signInWithMicrosoft() async {
+        let provider = OAuthProvider(providerID: "microsoft.com")
+        
+        // Optional: Add custom parameters or scopes if needed (e.g., for Azure AD tenant)
+        // provider.customParameters = ["tenant": "TENANT_ID"] // Use for specific Azure AD tenants
+        // provider.scopes = ["mail.read", "calendars.read"] // Request additional scopes
+
+        do {
+            // Present the Microsoft Sign-In flow
+            let authResult = try await Auth.auth().signIn(with: provider, uiDelegate: getRootViewController() as? AuthUIDelegate)
+            print(authResult)
+            let user = authResult.user
+            self.userSession = user
+
+            // ** 🔍 Your Existing Firestore/User Loading Logic **
+            if let email = user.email {
+                let (userInfo, username) = await fetchUserDataByEmail(email)
+                if let userInfo = userInfo {
+                    let registeredAt = userInfo["registeredAt"] as? Timestamp
+                    let date = registeredAt?.dateValue() ?? Date()
+
+                    self.currentUser = User(
+                        username: username ?? "",
+                        registeredAt: date,
+                        darkMode: true
+                    )
+                    
+                    self.userExistsInFirestore = true
+                    self.isLoadingUser = false
+                } else {
+                    self.userExistsInFirestore = false
+                    self.currentUser = nil
+                }
+                self.layerOneLoaded = true
+            }
+            
+            print("✅ Microsoft Sign-In successful for \(user.email ?? "unknown user")")
+            
+        } catch {
+            print("❌ Microsoft Sign-In failed:", error.localizedDescription)
+        }
+    }
+    
+    // MARK: - Yahoo Sign-In 🚀
+        @MainActor
+        func signInWithYahoo() async {
+            // Use the generic OAuthProvider with the Yahoo provider ID
+            let provider = OAuthProvider(providerID: "yahoo.com")
+            
+            // Optional: Add scopes to request specific user data from Yahoo.
+            // The 'profile' and 'email' scopes are often implicitly included but
+            // can be explicitly added if required for specific data or confirmation.
+            // provider.scopes = ["profile", "email"]
+
+            do {
+                // Present the Yahoo Sign-In flow using the root view controller
+                let authResult = try await Auth.auth().signIn(with: provider, uiDelegate: getRootViewController() as? AuthUIDelegate)
+                print(authResult)
+                let user = authResult.user
+                self.userSession = user
+
+                // ** 🔍 Your Existing Firestore/User Loading Logic **
+                if let email = user.email {
+                    let (userInfo, username) = await fetchUserDataByEmail(email)
+                    if let userInfo = userInfo {
+                        let registeredAt = userInfo["registeredAt"] as? Timestamp
+                        let date = registeredAt?.dateValue() ?? Date()
+
+                        self.currentUser = User(
+                            username: username ?? "",
+                            registeredAt: date,
+                            darkMode: true
+                        )
+                        
+                        self.userExistsInFirestore = true
+                        self.isLoadingUser = false
+                    } else {
+                        self.userExistsInFirestore = false
+                        self.currentUser = nil
+                    }
+                    self.layerOneLoaded = true
+                }
+                
+                print("✅ Yahoo Sign-In successful for \(user.email ?? "unknown user")")
+                
+            } catch {
+                print("❌ Yahoo Sign-In failed:", error.localizedDescription)
+            }
+        }
+
+    // Helper function to find the root view controller (similar to your Google sign-in)
+    private func getRootViewController() -> UIViewController {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            fatalError("❌ Unable to find root view controller")
+        }
+        return rootViewController
     }
     
     @MainActor

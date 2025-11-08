@@ -15,9 +15,7 @@ struct LoginView: View {
     @State private var email: String = ""
     @State private var emailCopy: String = ""
     @State private var emailSent: Bool = false
-    @State private var showTermsSheet = false
-    @State private var showPrivacySheet = false
-    @State private var selectedURL: URL?
+    @State private var webURLToPresent: URL? // Use an Optional URL
     @State private var isError: Bool = false
     @State private var errorMessage: String = ""
     @State private var isSigningIn: Bool
@@ -127,22 +125,18 @@ struct LoginView: View {
                             HStack {
                                 Text("Terms of Use")
                                     .onTapGesture {
-                                        selectedURL = URL(string: "https://thodea.com/policy/terms")
-                                        showTermsSheet = true
-                                    }
-                                    .sheet(isPresented: $showTermsSheet) {
-                                        FullScreenModalView(url: URL(string: "https://thodea.com/policy/terms")!)
+                                        // **KEY CHANGE**: Set the URL and the sheet will automatically appear
+                                        webURLToPresent = URL(string: "https://thodea.com/policy/terms")
                                     }
                                     .foregroundColor(.blue)
-                                Text("and").foregroundColor(.gray)                                .font(.system(size: 18))
+                                
+                                Text("and").foregroundColor(.gray)
+                                    .font(.system(size: 18))
                                 
                                 Text("Privacy Policy")
                                     .onTapGesture {
-                                        selectedURL = URL(string: "https://thodea.com/policy/privacy")
-                                        showPrivacySheet = true
-                                    }
-                                    .sheet(isPresented: $showPrivacySheet) {
-                                        FullScreenModalView(url: URL(string: "https://thodea.com/policy/privacy")!)
+                                        // **KEY CHANGE**: Set the URL and the sheet will automatically appear
+                                        webURLToPresent = URL(string: "https://thodea.com/policy/privacy")
                                     }
                                     .foregroundColor(.blue)
                             }
@@ -159,6 +153,12 @@ struct LoginView: View {
                         }
                     }
                     .padding()
+                }
+                .sheet(item: $webURLToPresent) { url in
+                    // Use the url from the binding unwrapped as 'url'
+                    FullScreenModalView(url: url)
+                        // .presentationDetents is good for a partial slide up,
+                        // but SFSafariViewController is typically Full Screen
                 }
                 
                 .overlay {
@@ -177,6 +177,14 @@ struct LoginView: View {
         case "google":
             Task {
                 await viewModel.signInWithGoogle()
+            }
+        case "microsoft":
+            Task {
+                await viewModel.signInWithMicrosoft()
+            }
+        case "yahoo":
+            Task {
+                await viewModel.signInWithYahoo()
             }
         default:
             print("❌ Unsupported provider:", provider)
@@ -279,5 +287,12 @@ struct LoaderView: View {
                 }
             }
         }.ignoresSafeArea()
+    }
+}
+
+// Extension to conform URL to Identifiable for the .sheet(item:) modifier
+extension URL: @retroactive Identifiable {
+    public var id: String {
+        self.absoluteString
     }
 }
