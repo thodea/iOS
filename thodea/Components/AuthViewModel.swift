@@ -17,6 +17,7 @@ class AuthViewModel: ObservableObject {
     @Published var userSession: FirebaseAuth.User?
     @Published var currentUser: User?
     @Published var isLoadingUser: Bool = true
+    @Published var isProcessing: Bool = false
     @Published var layerOneLoaded: Bool = false
     @AppStorage("user_exists_in_firestore") var userExistsInFirestore: Bool?
     
@@ -59,6 +60,8 @@ class AuthViewModel: ObservableObject {
             print("❌ Missing Firebase client ID")
             return
         }
+        
+        self.isProcessing = true
         
         let config = GIDConfiguration(clientID: clientID)
         GIDSignIn.sharedInstance.configuration = config
@@ -127,13 +130,15 @@ class AuthViewModel: ObservableObject {
         } catch {
             print("❌ Google Sign-In failed:", error.localizedDescription)
         }
+        self.isProcessing = false
     }
     
     // MARK: - Microsoft Sign-In
     @MainActor
     func signInWithMicrosoft() async {
         let provider = OAuthProvider(providerID: "microsoft.com")
-        
+        self.isProcessing = true
+        provider.customParameters = ["prompt": "select_account"]
         // Optional: Add custom parameters or scopes if needed (e.g., for Azure AD tenant)
         // provider.customParameters = ["tenant": "TENANT_ID"] // Use for specific Azure AD tenants
         // provider.scopes = ["mail.read", "calendars.read"] // Request additional scopes
@@ -172,6 +177,7 @@ class AuthViewModel: ObservableObject {
         } catch {
             print("❌ Microsoft Sign-In failed:", error.localizedDescription)
         }
+        self.isProcessing = false
     }
     
     // MARK: - Yahoo Sign-In 🚀
@@ -179,7 +185,9 @@ class AuthViewModel: ObservableObject {
         func signInWithYahoo() async {
             // Use the generic OAuthProvider with the Yahoo provider ID
             let provider = OAuthProvider(providerID: "yahoo.com")
-            
+            provider.customParameters = ["prompt": "login"]
+            self.isProcessing = true
+
             // Optional: Add scopes to request specific user data from Yahoo.
             // The 'profile' and 'email' scopes are often implicitly included but
             // can be explicitly added if required for specific data or confirmation.
@@ -219,6 +227,7 @@ class AuthViewModel: ObservableObject {
             } catch {
                 print("❌ Yahoo Sign-In failed:", error.localizedDescription)
             }
+            self.isProcessing = false
         }
 
     // Helper function to find the root view controller (similar to your Google sign-in)
@@ -309,7 +318,6 @@ class AuthViewModel: ObservableObject {
     func fetchUser() async {
         
     }
-    
     func sendEmail(to email: String) async {
         let actionCodeSettings = ActionCodeSettings()
         actionCodeSettings.url = URL(string: "https://www.thodea.com") // Your domain
@@ -317,21 +325,17 @@ class AuthViewModel: ObservableObject {
         actionCodeSettings.setIOSBundleID(Bundle.main.bundleIdentifier!)
 
         do {
+            // CORRECT: Call the async/throws version
             try await Auth.auth().sendSignInLink(toEmail: email, actionCodeSettings: actionCodeSettings)
-                /*{ error in
-                if let error = error {
-                    print("Error sending sign-in link: \(error)")
-                    return
-                }
-                // Save email locally for verification later
-                UserDefaults.standard.set(email, forKey: "Email")
-                print("Check your email for the sign-in link.")
-            }*/
+            
+            // Success code goes here, after a successful 'try await'
+            // The error closure is removed.
+           /* UserDefaults.standard.set(email, forKey: "Email")
+            print("Check your email for the sign-in link.")*/
+            
+        } catch { // The 'catch' block is now reachable because 'sendSignInLink' throws an error
+            print("Error sending sign-in link: \(error.localizedDescription)")
         }
-        catch {
-            print(error.localizedDescription)
-        }
-       
     }
     
 }
