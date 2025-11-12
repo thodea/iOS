@@ -33,7 +33,11 @@ struct ContentView: View {
                    
                     
                 } else {
-                    LoginView(isSigningIn: false)
+                    if authViewModel.isProcessing == false  {
+                        LoginView(isSigningIn: false)
+                    } else {
+                        LoginView(isSigningIn: true)
+                    }
                 }
                 
                 Spacer()

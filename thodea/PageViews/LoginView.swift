@@ -80,6 +80,17 @@ struct LoginView: View {
                                 .padding(.bottom, 8)
                                 .foregroundColor(.white.opacity(0.85))
                                 .padding(.horizontal)
+                                // ----------------------------------------------------
+                                // ✨ New Modifiers for Lowercase Input ✨
+                                // ----------------------------------------------------
+                                // 1. Prevents the device's keyboard from capitalizing the first letter
+                                .textInputAutocapitalization(.never)
+                                // 2. Converts the input to lowercase every time the text changes
+                                .onChange(of: email) { newValue in
+                                    // This closure receives the new value after the text changes
+                                    email = newValue.lowercased()
+                                }
+                                // ----------------------------------------------------
                                 .overlay(
                                     VStack {
                                         Spacer()
@@ -87,9 +98,9 @@ struct LoginView: View {
                                             .fill(Color(red: 30 / 255, green: 58 / 255, blue: 138 / 255))
                                             .frame(height: 3)
                                     }
-                                        .padding(.horizontal)
-                                )                                        .padding(.bottom, 12)
-                                
+                                    .padding(.horizontal)
+                                )
+                                .padding(.bottom, 12)
                                 //TextField("", text: $email)
                                 
                                 
@@ -193,27 +204,34 @@ struct LoginView: View {
     
     
     func userLogIn() {
+        // 1. Convert the email to lowercase for consistent validation and usage
+        let lowercaseEmail = email.lowercased()
+        
         let emailRegex = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+        // Note: The regex is case-insensitive by default in NSPredicate when using the standard pattern,
+        // but converting the input to lowercase is still best practice for comparison/storage.
         let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
         
-        if emailPredicate.evaluate(with: email) {
+        // 2. Use the lowercaseEmail for evaluation
+        if emailPredicate.evaluate(with: lowercaseEmail) {
             emailSent = true
             isError = false
             
-            // Simulate email sending
+            // Use the lowercaseEmail for the actual API call/email sending
             Task {
-                await viewModel.sendEmail(to: email)
-                //sendEmail(email: email)
+                await viewModel.sendEmail(to: lowercaseEmail)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    // Keep 'email' as the original input or set it to lowercase if you prefer the UI to reflect the lowercase version
                     email = ""
                 }
             }
         } else {
-            emailCopy = email
+            // ... (Error handling remains the same)
+            emailCopy = email // The original, potentially mixed-case input is saved here
             email = ""
             isError = true
             errorMessage = "Enter a valid email"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isError = false
                 errorMessage = ""
                 email = emailCopy
