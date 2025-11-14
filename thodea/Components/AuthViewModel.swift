@@ -11,6 +11,7 @@ import GoogleSignIn
 import GoogleSignInSwift
 import FirebaseCore
 import FirebaseFirestore
+import FirebaseDatabase // 👈 Add Realtime Database import
 import SwiftUI
 
 class AuthViewModel: ObservableObject {
@@ -286,10 +287,7 @@ class AuthViewModel: ObservableObject {
                 return (nil, nil)
             }
         }
-    
-    func createUser(withEmail email: String, fullname: String) async throws {
-        
-    }
+
     
     func signOut() {
         do {
@@ -304,20 +302,60 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    func deleteAccount() {
-        Auth.auth().currentUser?.delete { error in
-            if let error = error {
-                print("❌ Error deleting account:", error.localizedDescription)
-            } else {
-                self.userSession = nil
-                print("✅ Account deleted successfully")
+
+    @MainActor // 👈 1. Ensures all state updates are 100% thread-safe
+    func deleteAccount() async {
+        
+        // 2. Get the current user AND username *before* deleting
+        guard let _ = Auth.auth().currentUser, // Check if user session exists (Auth deletion is removed)
+              let username = self.currentUser?.username, !username.isEmpty else {
+            print("❌ Cannot delete: User or username is not loaded.")
+            return
+        }
+        
+        // 3. Set up references to all the data you created
+        let fdb = Firestore.firestore()
+        let db = Database.database().reference()
+        
+        let firestoreRef = fdb.collection("user").document(username)
+        let realtimeRef = db.child("user").child(username)
+
+        do {
+            // 4. Use a TaskGroup to delete everything in parallel
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                
+                // Task 2: Delete from Firestore
+                group.addTask {
+                    try await firestoreRef.delete()
+                }
+                
+                // Task 3: Delete from Realtime Database
+                group.addTask {
+                    try await realtimeRef.removeValue()
+                }
+                
+                // Wait for all 3 tasks to complete
+                try await group.waitForAll()
             }
+            
+            // 5. Success: Clear all local user state
+            print("✅ Account and all associated data deleted successfully.")
+            signOut()
+
+        } catch {
+            print("❌ Error deleting account or data: \(error.localizedDescription)")
+            // Note: If this error is "requiresRecentLogin",
+            // you will need to prompt the user to re-authenticate.
         }
     }
     
+    @MainActor
     func fetchUser() async {
-        
+        self.isLoadingUser = true
+        await loadUserSession()
+        self.userExistsInFirestore = true
     }
+    
     func sendEmail(to email: String) async {
         let actionCodeSettings = ActionCodeSettings()
         actionCodeSettings.url = URL(string: "https://www.thodea.com") // Your domain
