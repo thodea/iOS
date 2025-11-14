@@ -21,7 +21,7 @@ struct SettingsView: View {
     @State private var userCount: Int = 0 // Track selected tab
     @State private var showSafariView = false
     @State private var selectedURL: URL?
-
+    @State private var isDeleting: Bool = false
     
     var body: some View {
             VStack(spacing: 16) {
@@ -50,8 +50,13 @@ struct SettingsView: View {
                 
                 HStack {
                     Button(action: {
-                        // Add your "DELETE" button action here
-                        print("DELETE tapped")
+                        Task {
+                            isDeleting = true // 👈 ADD THIS
+                            await authViewModel.deleteAccount() // 👈 Use 'await'
+                            presentationMode.wrappedValue.dismiss()
+                            isDeleting = false
+                            print("DELETE tapped")
+                        }
                     }) {
                         Text("DELETE")
                             .padding(4).padding(.horizontal, 4) // Add padding for button-like appearance
@@ -122,6 +127,11 @@ struct SettingsView: View {
                         .foregroundColor(.blue.opacity(0.8)) // Color of the icon
                 })
             .navigationBarTitleDisplayMode(.inline)
+            .overlay {
+                if isDeleting {
+                    LoaderView()
+                }
+            }
             .toolbar{
                 ToolbarItem(placement: .principal) {
                     Text("Settings")
