@@ -54,14 +54,16 @@ struct ContentView: View {
             .foregroundColor(.white)
             .onAppear {
                 // Automatically show feed when user is logged in
-                if authViewModel.userSession != nil {
+                if authViewModel.userSession != nil && selectedNavItem == "login" {
                     selectedNavItem = "feed"
                 }
             }
             .onChange(of: authViewModel.userSession) { newUserSession in
                 // Update navigation when auth state changes
                 if newUserSession != nil {
-                    selectedNavItem = "feed"
+                    if selectedNavItem == "login" {
+                        selectedNavItem = "feed"
+                    }
                 } else {
                     selectedNavItem = "login"
                 }

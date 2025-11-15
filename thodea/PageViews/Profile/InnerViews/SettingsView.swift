@@ -14,6 +14,8 @@
 
 import SwiftUI
 import WebKit
+import FirebaseDatabase
+
 
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -132,6 +134,9 @@ struct SettingsView: View {
                     LoaderView()
                 }
             }
+            .onAppear {
+                fetchUserCount()
+            }
             .toolbar{
                 ToolbarItem(placement: .principal) {
                     Text("Settings")
@@ -143,7 +148,27 @@ struct SettingsView: View {
 
 
     }
+    func fetchUserCount() {
+        let ref = Database.database().reference().child("users")
+        
+        ref.observeSingleEvent(of: .value) { snapshot in
+            if snapshot.exists() {
+                let count = Int(snapshot.value as? Int ?? 0)
+                //print("Fetched count:", snapshot.value ?? 0)
+
+                DispatchQueue.main.async {
+                    self.userCount = count
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.userCount = 0
+                }
+            }
+        }
+    }
 }
+
+
 
 
 struct BioButton: View {

@@ -63,7 +63,9 @@ class ChatHelper: ObservableObject {
                 username: "Me",
                 registeredAt: Date(),
                 darkMode: true,
-                profileUrl: "https://example.com/images/me.jpg"
+                followers: 0,
+                followings: 0,
+                thoughts: 0
             )
         let newMessage = Message(content: content, user: currentUser, createdAt: Date())
         

@@ -93,29 +93,8 @@ class AuthViewModel: ObservableObject {
             let user = authResult.user
             self.userSession = user
             
-            // 🔍 Check Firestore for existing user document
-            if let email = user.email {
-                let (userInfo, username) = await fetchUserDataByEmail(email)
-                if let userInfo = userInfo {
-                    // Safely extract registeredAt from userInfo
-                    let registeredAt = userInfo["registeredAt"] as? Timestamp
-                    let date = registeredAt?.dateValue() ?? Date() // fallback to current date if missing
-
-                    self.currentUser = User(
-                        username: username ?? "",
-                        registeredAt: date,
-                        darkMode: true
-                    )
-                    
-                    self.userExistsInFirestore = true
-                    self.isLoadingUser = false
-                } else {
-                    // User does not exist in Firestore — navigate to Setup
-                    self.userExistsInFirestore = false
-                    self.currentUser = nil
-                }
-                self.layerOneLoaded = true
-            }
+            // 🔥 Centralized user loading
+            await loadUserSession()
     
             //print("✅ Google Sign-In successful for \(user.email ?? "unknown user")")
             
@@ -151,27 +130,8 @@ class AuthViewModel: ObservableObject {
             let user = authResult.user
             self.userSession = user
 
-            // ** 🔍 Your Existing Firestore/User Loading Logic **
-            if let email = user.email {
-                let (userInfo, username) = await fetchUserDataByEmail(email)
-                if let userInfo = userInfo {
-                    let registeredAt = userInfo["registeredAt"] as? Timestamp
-                    let date = registeredAt?.dateValue() ?? Date()
-
-                    self.currentUser = User(
-                        username: username ?? "",
-                        registeredAt: date,
-                        darkMode: true
-                    )
-                    
-                    self.userExistsInFirestore = true
-                    self.isLoadingUser = false
-                } else {
-                    self.userExistsInFirestore = false
-                    self.currentUser = nil
-                }
-                self.layerOneLoaded = true
-            }
+            // 🔥 Centralized user loading
+            await loadUserSession()
             
             print("✅ Microsoft Sign-In successful for \(user.email ?? "unknown user")")
             
@@ -201,28 +161,9 @@ class AuthViewModel: ObservableObject {
                 let user = authResult.user
                 self.userSession = user
 
-                // ** 🔍 Your Existing Firestore/User Loading Logic **
-                if let email = user.email {
-                    let (userInfo, username) = await fetchUserDataByEmail(email)
-                    if let userInfo = userInfo {
-                        let registeredAt = userInfo["registeredAt"] as? Timestamp
-                        let date = registeredAt?.dateValue() ?? Date()
-
-                        self.currentUser = User(
-                            username: username ?? "",
-                            registeredAt: date,
-                            darkMode: true
-                        )
-                        
-                        self.userExistsInFirestore = true
-                        self.isLoadingUser = false
-                    } else {
-                        self.userExistsInFirestore = false
-                        self.currentUser = nil
-                    }
-                    self.layerOneLoaded = true
-                }
-                
+                // 🔥 Centralized user loading
+                await loadUserSession()
+        
                 print("✅ Yahoo Sign-In successful for \(user.email ?? "unknown user")")
                 
             } catch {
@@ -252,20 +193,45 @@ class AuthViewModel: ObservableObject {
 
         if let email = user.email {
             let (userInfo, username) = await fetchUserDataByEmail(email)
+            let userStats = await fetchUserStats(username: username ?? "")
             if let userInfo = userInfo {
                 let registeredAt = userInfo["registeredAt"] as? Timestamp
                 let date = registeredAt?.dateValue() ?? Date()
-
+                
+                // Data from Realtime DB (with defaults)
+                let followers = userStats?["followers"] as? Int ?? 0
+                let followings = userStats?["following"] as? Int ?? 0
+                let thoughts = userStats?["thoughts"] as? Int ?? 0
+            
                 self.currentUser = User(
                     username: username ?? "",
                     registeredAt: date,
-                    darkMode: true
+                    darkMode: true,
+                    followers: followers,
+                    followings: followings,
+                    thoughts: thoughts
                 )
 
             }
         }
 
         self.isLoadingUser = false
+    }
+    
+    
+    // Fetches the user's stats (followers, etc.) from Realtime Database
+    func fetchUserStats(username: String) async -> [String: Any]? {
+        let db = Database.database().reference()
+        let realtimeRef = db.child("user").child(username)
+        
+        do {
+            // Use the modern async/await API to get the data
+            let snapshot = try await realtimeRef.getData()
+            return snapshot.value as? [String: Any]
+        } catch {
+            print("❌ Error fetching RTDB user stats: \(error.localizedDescription)")
+            return nil
+        }
     }
     
     func fetchUserDataByEmail(_ email: String) async -> (userInfo: [String: Any]?, username: String?) {

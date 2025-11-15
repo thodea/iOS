@@ -5,8 +5,8 @@ struct ProfileView: View {
     @State private var userImage: String = "profile_picture"
     @State private var selectedTab: String = "thoughts"
     @State private var bioInfo: Bool = true
-    @State private var profileInfo: [String: Any] = ["thoughts": 0, "followers": 1, "following": 1]
-  
+    @EnvironmentObject var viewModel: AuthViewModel
+
     
     var body: some View {
         
@@ -25,9 +25,14 @@ struct ProfileView: View {
                 }
                 
                     //.border(.green, width: 2)
-                Text("username")
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                if let user = viewModel.currentUser {
+                    Text(user.username)
+                        .font(.system(size: 18, weight: .bold))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                } else {
+                    ProgressView() // or nothing
+                }
+                    
                 ZStack(alignment: .topTrailing) {
                        // Envelope Image
                     
@@ -76,8 +81,8 @@ struct ProfileView: View {
             
                 VStack() {
                         HStack {
-                            let followers = profileInfo["followers"] as! Int
-                            Text("\(formatNumber(followers)) \(followers == 1 ? "follower" : "followers")")
+                            let followers = viewModel.currentUser?.followers
+                            Text("\(formatNumber(followers ?? 0)) \(followers == 1 ? "follower" : "followers")")
                                 .font(.system(size: 17)).fixedSize()
                            
                            Spacer() // Push the next elements to the right
@@ -101,7 +106,7 @@ struct ProfileView: View {
                     
                         
                         HStack {
-                            Text("\(formatNumber(profileInfo["following"] as! Int)) following")
+                            Text("\(formatNumber(viewModel.currentUser?.followings ?? 0)) following")
                                .font(.system(size: 17)).fixedSize()
                            
                            Spacer() // Push the next elements to the right
@@ -131,9 +136,9 @@ struct ProfileView: View {
             
             VStack {
                      HStack {
-                         TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: profileInfo["thoughts"] as? Int ?? 0)
-                         TabButton(title: "loved", selectedTab: $selectedTab, bioInfo: bioInfo, count: profileInfo["loved"] as? Int ?? 0)
-                         TabButton(title: "mentions", selectedTab: $selectedTab, bioInfo: bioInfo, count: profileInfo["mentioned"] as? Int ?? 0)
+                         TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: viewModel.currentUser?.thoughts ?? 0)
+                         TabButton(title: "loved", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
+                         TabButton(title: "mentions", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
                      }
                      .padding(.top, bioInfo ? 2 : 4)  // Adjust the margin based on `bioInfo`
                      .frame(maxHeight: 50)
