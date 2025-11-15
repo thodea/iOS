@@ -47,8 +47,64 @@ struct User {
     var profileUrl: String?
     var profileMiniUrl: String?
     var deleted: Bool?
-    // var lastChecked
-    // var seen
+    
+    init(
+        username: String,
+        registeredAt: Date,
+        darkMode: Bool,
+        followers: Int,
+        followings: Int,
+        thoughts: Int
+    ) {
+        self.username = username
+        self.registeredAt = registeredAt
+        self.darkMode = darkMode
+        self.followers = followers
+        self.followings = followings   // FIX: map “following” → “followings”
+        self.thoughts = thoughts
+
+        // Default optional values
+        self.following = nil
+        self.chatRequest = false
+        self.newChat = false
+        self.bio = nil
+        self.following = nil
+        self.profileUrl = nil
+        self.profileMiniUrl = nil
+        self.deleted = false
+    }
+    
+    // 1️⃣ Full initializer (for your ChatHelper mock data)
+        init(
+            username: String,
+            followers: Int,
+            followings: Int,
+            thoughts: Int,
+            chatRequest: Bool,
+            newChat: Bool,
+            bio: String?,
+            registeredAt: Date,
+            darkMode: Bool,
+            following: [String]?,
+            profileUrl: String?,
+            profileMiniUrl: String?,
+            deleted: Bool
+        ) {
+            self.username = username
+            self.followers = followers
+            self.followings = followings
+            self.thoughts = thoughts
+            self.chatRequest = chatRequest
+            self.newChat = newChat
+            self.bio = bio
+            self.registeredAt = registeredAt
+            self.darkMode = darkMode
+            self.following = following
+            self.profileUrl = profileUrl
+            self.profileMiniUrl = profileMiniUrl
+            self.deleted = deleted
+        }
+        
 }
 
 struct Message: Identifiable {
