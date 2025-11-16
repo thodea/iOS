@@ -20,11 +20,29 @@ import FirebaseDatabase
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var authViewModel: AuthViewModel // Add this
+    // State to manage the confirmation modal
+    @State private var showConfirmation: Bool = false
+    @State private var pendingAction: ActionType? = nil
     @State private var userCount: Int = 0 // Track selected tab
     @State private var showSafariView = false
     @State private var selectedURL: URL?
     @State private var isDeleting: Bool = false
     
+    // Enum to define the possible actions requiring confirmation
+    enum ActionType {
+        case logout
+        case delete
+        
+        var confirmationMessage: String {
+            switch self {
+            case .logout:
+                return "LOG OUT?"
+            case .delete:
+                return "DELETE ACCOUNT?"
+            }
+        }
+    }
+
     var body: some View {
             VStack(spacing: 16) {
                 // Search TextField
@@ -33,10 +51,8 @@ struct SettingsView: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
                 HStack {
                     Button(action: {
-                        // Add your "LOG OUT" button action here
-                        authViewModel.signOut()
-                        presentationMode.wrappedValue.dismiss()
-                        print("LOG OUT tapped")
+                        pendingAction = .logout
+                        showConfirmation = true
                     }) {
                         Text("LOG OUT")
                             .padding(4).padding(.horizontal, 4)
@@ -52,14 +68,9 @@ struct SettingsView: View {
                 
                 HStack {
                     Button(action: {
-                        Task {
-                            isDeleting = true // 👈 ADD THIS
-                            await authViewModel.deleteAccount() // 👈 Use 'await'
-                            presentationMode.wrappedValue.dismiss()
-                            isDeleting = false
-                            print("DELETE tapped")
-                        }
-                    }) {
+                       pendingAction = .delete
+                       showConfirmation = true
+                   }) {
                         Text("DELETE")
                             .padding(4).padding(.horizontal, 4) // Add padding for button-like appearance
                             .background(Color(red: 252 / 255, green: 165 / 255, blue: 165 / 255)) // Background color
@@ -76,6 +87,28 @@ struct SettingsView: View {
                 HStack(){
                     Text("users: \(userCount)")
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8).font(.system(size: 19)).foregroundColor(.white.opacity(0.6))
+                
+                // --- NEW ABOUT BUTTON ADDED HERE ---
+                HStack {
+                    Button(action: {
+                        selectedURL = URL(string: "https://thodea.com/about") // Use your actual About URL
+                        showSafariView = true
+                    }) {
+                        Text("About")
+                            .padding(4).padding(.horizontal, 4)
+                            // Applying styling similar to your Next.js Tailwind classes (from-indigo-400 to-blue-300)
+                            .background(
+                                LinearGradient(gradient: Gradient(colors: [Color(red: 129/255, green: 140/255, blue: 248/255), Color(red: 147/255, green: 197/255, blue: 253/255)]), startPoint: .top, endPoint: .bottomLeading)
+                            )
+                            .foregroundColor(Color(red: 31/255, green: 41/255, blue: 55/255))
+                            .cornerRadius(2) // Rounded corners
+                            .fontWeight(.bold)
+                            .shadow(color: Color.black.opacity(1), radius: 4, x: 0, y: 1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+                // ------------------------------------
                 
                 Spacer()
 
@@ -129,13 +162,46 @@ struct SettingsView: View {
                         .foregroundColor(.blue.opacity(0.8)) // Color of the icon
                 })
             .navigationBarTitleDisplayMode(.inline)
-            .overlay {
-                if isDeleting {
-                    LoaderView()
-                }
-            }
             .onAppear {
                 fetchUserCount()
+            }
+            // Overlay for both the loader and the custom confirmation modal
+            .overlay {
+                if isDeleting {
+                    // Show Loader for Deleting action
+                    LoaderView()
+                } else if showConfirmation, let action = pendingAction {
+                    // Show Confirmation Modal
+                    ConfirmationModalView(
+                        message: action.confirmationMessage,
+                        onConfirm: {
+                            // Execute the pending action
+                            switch action {
+                            case .logout:
+                                authViewModel.signOut()
+                                presentationMode.wrappedValue.dismiss()
+                                print("LOG OUT confirmed")
+                            case .delete:
+                                Task {
+                                    isDeleting = true // Start loading state
+                                    await authViewModel.deleteAccount()
+                                    presentationMode.wrappedValue.dismiss()
+                                    isDeleting = false // End loading state
+                                    print("DELETE confirmed")
+                                }
+                            }
+                            // Hide the modal regardless of action
+                            showConfirmation = false
+                            pendingAction = nil
+                        },
+                        onCancel: {
+                            // Cancel the action and hide the modal
+                            showConfirmation = false
+                            pendingAction = nil
+                            print("Action cancelled")
+                        }
+                    )
+                }
             }
             .toolbar{
                 ToolbarItem(placement: .principal) {
@@ -154,7 +220,6 @@ struct SettingsView: View {
         ref.observeSingleEvent(of: .value) { snapshot in
             if snapshot.exists() {
                 let count = Int(snapshot.value as? Int ?? 0)
-                //print("Fetched count:", snapshot.value ?? 0)
 
                 DispatchQueue.main.async {
                     self.userCount = count
@@ -243,6 +308,69 @@ struct WebView: UIViewRepresentable {
             spinner?.stopAnimating()
             spinner?.removeFromSuperview()
             spinner = nil
+        }
+    }
+}
+
+struct ConfirmationModalView: View {
+    let message: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        // Full screen, semi-transparent background (the "layer")
+        ZStack {
+            Color.black.opacity(0.4)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    // Tapping outside cancels the action
+                    onCancel()
+                }
+            
+            // The modal content box
+            VStack(spacing: 15) {
+                // Text replicating:
+                // <div className="flex flex-row bg-transparent text-white font-bold rounded-sm min-w-[130px] text-center items-center justify-center">{modalText}</div>
+                Text(message)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding()
+                
+                // Buttons replicating:
+                // <div className="flex flex-row mt-4 text-black font-bold rounded-sm min-w-[150px] text-center items-center justify-center">...</div>
+                HStack(spacing: 16) {
+                    // YES Button (Confirm)
+                    Button(action: onConfirm) {
+                        Text("Yes")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.7)) // purple-400 opacity 70
+                            .foregroundColor(.black)
+                            .cornerRadius(4)
+                            .shadow(color: .black, radius: 4, x: 0, y: 2)
+                    }
+                    
+                    // NO Button (Cancel)
+                    Button(action: onCancel) {
+                        Text("No")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color(red: 8 / 255, green: 145 / 255, blue: 178 / 255)) // cyan-600
+                            .foregroundColor(.black)
+                            .cornerRadius(4)
+                            .shadow(color: .black, radius: 4, x: 0, y: 2)
+                    }
+                }
+                .frame(minWidth: 150) // min-w-[150px] equivalent
+            }
+            .padding(20)
+            .background(Color(red: 17/255, green: 24/255, blue: 39/255)) // Dark background for the modal itself
+            .cornerRadius(10)
+            .padding(.horizontal, 40)
         }
     }
 }

@@ -24,7 +24,6 @@ class AuthViewModel: ObservableObject {
     
     init() {
         self.userSession = Auth.auth().currentUser
-        print(userSession?.email as Any)
         // Check if userExistsInFirestore has been defined (is not nil)
         if self.userExistsInFirestore != nil {
             // If it's defined (i.e., a value has been set previously)
@@ -193,8 +192,8 @@ class AuthViewModel: ObservableObject {
 
         if let email = user.email {
             let (userInfo, username) = await fetchUserDataByEmail(email)
-            let userStats = await fetchUserStats(username: username ?? "")
             if let userInfo = userInfo {
+                let userStats = await fetchUserStats(username: username ?? "")
                 let registeredAt = userInfo["registeredAt"] as? Timestamp
                 let date = registeredAt?.dateValue() ?? Date()
                 
@@ -211,8 +210,15 @@ class AuthViewModel: ObservableObject {
                     followings: followings,
                     thoughts: thoughts
                 )
-
+                
+                self.userExistsInFirestore = true
+                self.isLoadingUser = false
+            } else {
+                // User does not exist in Firestore — navigate to Setup
+                self.userExistsInFirestore = false
+                self.currentUser = nil
             }
+            self.layerOneLoaded = true
         }
 
         self.isLoadingUser = false
