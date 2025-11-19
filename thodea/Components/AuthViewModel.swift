@@ -196,7 +196,8 @@ class AuthViewModel: ObservableObject {
                 let userStats = await fetchUserStats(username: username ?? "")
                 let registeredAt = userInfo["registeredAt"] as? Timestamp
                 let date = registeredAt?.dateValue() ?? Date()
-                
+                let bio = userInfo["bio"] as? String
+
                 // Data from Realtime DB (with defaults)
                 let followers = userStats?["followers"] as? Int ?? 0
                 let followings = userStats?["following"] as? Int ?? 0
@@ -208,7 +209,8 @@ class AuthViewModel: ObservableObject {
                     darkMode: true,
                     followers: followers,
                     followings: followings,
-                    thoughts: thoughts
+                    thoughts: thoughts,
+                    bio: bio
                 )
                 
                 self.userExistsInFirestore = true

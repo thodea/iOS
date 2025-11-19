@@ -65,7 +65,8 @@ class ChatHelper: ObservableObject {
                 darkMode: true,
                 followers: 0,
                 followings: 0,
-                thoughts: 0
+                thoughts: 0,
+                bio: nil
             )
         let newMessage = Message(content: content, user: currentUser, createdAt: Date())
         
