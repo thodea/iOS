@@ -54,7 +54,8 @@ struct User {
         darkMode: Bool,
         followers: Int,
         followings: Int,
-        thoughts: Int
+        thoughts: Int,
+        bio: String?
     ) {
         self.username = username
         self.registeredAt = registeredAt
@@ -62,12 +63,12 @@ struct User {
         self.followers = followers
         self.followings = followings   // FIX: map “following” → “followings”
         self.thoughts = thoughts
+        self.bio = bio
 
         // Default optional values
         self.following = nil
         self.chatRequest = false
         self.newChat = false
-        self.bio = nil
         self.following = nil
         self.profileUrl = nil
         self.profileMiniUrl = nil

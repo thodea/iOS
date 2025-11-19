@@ -235,24 +235,29 @@ struct SettingsView: View {
 
 
 
-
 struct BioButton: View {
     var body: some View {
-        HStack(spacing: 0) {
-            Text("Add bio")
-                .font(.title3)
-                .fixedSize()
-                .fontWeight(.bold)
-                //.border(.red, width: 2)
-            
-            //rgb(147 197 253
-            Circle()
-                .fill(Color(red: 147/255, green: 197/255, blue: 253/255)) // Set the color of the circle to blue
-                .frame(width: 10, height: 10, alignment: .leading)
-                .padding(.horizontal, 8)
-                //.border(.green, width: 2)// Set a fixed size for the circle
+        // 1. Wrap the existing content in a NavigationLink
+        NavigationLink(destination: BioView()) {
+            HStack(spacing: 0) {
+                Text("Add bio")
+                    .font(.title3)
+                    .fixedSize()
+                    .fontWeight(.bold)
+                    .foregroundColor(Color(red: 229 / 255, green: 231 / 255, blue: 235 / 255))                
+                // The blue circle indicator
+                Circle()
+                    .fill(Color(red: 147/255, green: 197/255, blue: 253/255))
+                    .frame(width: 10, height: 10, alignment: .leading)
+                    .padding(.horizontal, 8)
+            }
+            // 2. Add an invisible button style modifier to make the
+            // entire NavigationLink look like a clean, clickable element.
+            // This is key to matching the "invisible button" style of NavigationLink.
+            .buttonStyle(PlainButtonStyle())
         }
-        //.border(.green, width: 2) // Border for visualization
+        // 3. Optional: Add a subtle hover/press effect to confirm tapability
+        .contentShape(Rectangle())
     }
 }
 
