@@ -37,3 +37,32 @@ func formatNumber(_ num: Int) -> String {
     }
     return "\(num)"
 }
+
+extension String {
+    func toMarkdown() -> AttributedString {
+        var attributedString = AttributedString(self)
+        
+        // 1. Create a Data Detector for links
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return attributedString
+        }
+        
+        // 2. Find matches in the string
+        let matches = detector.matches(in: self, options: [], range: NSRange(location: 0, length: self.utf16.count))
+        
+        // 3. Iterate matches and apply the .link attribute
+        for match in matches.reversed() { // Reverse to avoid index shifting issues
+            guard let range = Range(match.range, in: self) else { continue }
+            guard let url = match.url else { continue }
+            
+            // Convert String range to AttributedString range
+            if let attributedRange = attributedString.range(of: self[range]) {
+                attributedString[attributedRange].link = url
+                // Optional: Underline to look like a link
+            }
+        }
+        
+        return attributedString
+    }
+}
+
