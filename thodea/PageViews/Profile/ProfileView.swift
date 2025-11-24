@@ -1,12 +1,19 @@
 import SwiftUI
 
+struct WebViewData: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 struct ProfileView: View {
     @State private var userName: String = "John Doe" // Sample username
     @State private var userImage: String = "profile_picture"
     @State private var selectedTab: String = "thoughts"
     @State private var bioInfo: Bool = true
     @EnvironmentObject var viewModel: AuthViewModel
-
+    @EnvironmentObject var authViewModel: AuthViewModel // Add this
+    // 2. CHANGE: Replace the Bool and URL? with this single state variable
+    @State private var webViewData: WebViewData?
     
     var body: some View {
         
@@ -134,6 +141,26 @@ struct ProfileView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 4)
             
+            if let bio = viewModel.currentUser?.bio, !bio.isEmpty {
+                HStack {
+                    Text(bio.toMarkdown())
+                        .font(.system(size: 17)) // Adjust size to match styling
+                        .foregroundColor(Color(red: 156/255, green: 163/255, blue: 175/255)) // Matches text-gray-400
+                        .lineLimit(3) // Matches max-h-[50px] + truncate behavior
+                        .tint(.blue)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true) // Ensures text wraps properly
+                        .environment(\.openURL, OpenURLAction { url in
+                            // We trigger the sheet by setting this variable to a new struct
+                            webViewData = WebViewData(url: url)
+                            return .handled
+                        })
+                    Spacer() // Pushes text to the left
+                }
+                .padding(.top, 6) // Matches mt-4
+                //.border(Color.red, width: 2)
+            }
+            
             VStack {
                      HStack {
                          TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: viewModel.currentUser?.thoughts ?? 0)
@@ -147,6 +174,10 @@ struct ProfileView: View {
             //.border(Color.green, width: 2)
             
         }.padding()
+        .sheet(item: $webViewData) { data in
+            FullScreenModalView(url: data.url)
+                .edgesIgnoringSafeArea(.all)
+        }
     }
 }
 
@@ -250,8 +281,9 @@ struct BottomBorder: View {
     }
 }
 
-struct ProfileView_Previews: PreviewProvider {
-    static var previews: some View {
-        ProfileView()
-    }
+#Preview {
+    // 1. Instantiate the view without arguments (as defined by struct BioView: View)
+    ProfileView()
+        // 2. Attach an instance of the EnvironmentObject to the view hierarchy
+        .environmentObject(AuthViewModel())
 }
