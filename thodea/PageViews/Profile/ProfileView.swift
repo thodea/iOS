@@ -12,9 +12,10 @@ struct ProfileView: View {
     @State private var bioInfo: Bool = true
     @EnvironmentObject var viewModel: AuthViewModel
     @EnvironmentObject var authViewModel: AuthViewModel // Add this
-    // 2. CHANGE: Replace the Bool and URL? with this single state variable
     @State private var webViewData: WebViewData?
-    
+    @State private var isImageMenuOpen = false
+    @State private var isUploading = false
+
     var body: some View {
         
         
@@ -84,6 +85,9 @@ struct ProfileView: View {
                             .foregroundColor(.gray)
                     }
                     .frame(width: 100, height: 100)
+                    .onTapGesture {
+                        isImageMenuOpen = true
+                    }
 
             
                 VStack() {
@@ -178,6 +182,64 @@ struct ProfileView: View {
             FullScreenModalView(url: data.url)
                 .edgesIgnoringSafeArea(.all)
         }
+        .fullScreenCover(isPresented: $isImageMenuOpen) {
+            ZStack {
+
+                // 🔹 Background tap closes menu (same as onClick in React)
+                Color.blue.opacity(0.2)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        if !isUploading {
+                            isImageMenuOpen = false
+                        }
+                    }
+
+                // TOP-aligned menu
+                VStack(alignment: .center, spacing: 0) {
+
+                    if isUploading {
+
+                        HStack(spacing: 12) {
+                            Text("Uploading")
+                                .font(.headline)
+
+                            ProgressView()
+                        }
+                        .padding(.top, 40)
+
+                    } else {
+
+                        // Image Help (mt-2)
+                        modalButton(title: "Image Help")
+                            .padding(.top, 20)
+
+                        // Preview (mt-6)
+                        modalButton(title: "Preview") {
+                            print("Preview tapped")
+                        }
+                        .padding(.top, 24)
+
+                        // Remove (mt-6)
+                        modalButton(title: "Remove") {
+                            print("Remove tapped")
+                        }
+                        .padding(.top, 24)
+
+                        // Upload (mt-6)
+                        modalButton(title: "Upload") {
+                            print("Upload tapped")
+                        }
+                        .padding(.top, 24)
+                    }
+
+                    Spacer()   // pushes buttons to start at top
+                }
+                .padding(.horizontal, 30)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Color.clear)
+            }
+            .background(Color.clear)
+        }
     }
 }
 
@@ -228,7 +290,9 @@ struct SettingsSVG: View {
      
         }
         .frame(width: 24, height: 24)
+        
     }
+    
 }
 
 struct TabButton: View {
@@ -286,4 +350,31 @@ struct BottomBorder: View {
     ProfileView()
         // 2. Attach an instance of the EnvironmentObject to the view hierarchy
         .environmentObject(AuthViewModel())
+}
+
+@ViewBuilder
+func modalButton(title: String, action: (() -> Void)? = nil) -> some View {
+
+    let isHelp = (title == "Image Help")
+
+    let bgColor = isHelp
+        ? Color.black
+        : Color(red: 3/255, green: 105/255, blue: 161/255)
+
+    let textColor = Color(red: 229/255, green: 231/255, blue: 235/255)
+
+    Button(action: { if !isHelp { action?() } }) {
+        Text(title)
+            .font(.system(size: 16, weight: .semibold))
+            .frame(maxWidth: 150)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(bgColor)
+            )
+            .foregroundColor(textColor)
+    }
+    .buttonStyle(.plain)
+    // 🚫 Disable any tap interaction for Image Help
+    .allowsHitTesting(!isHelp)
 }
