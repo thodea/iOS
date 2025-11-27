@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct WebViewData: Identifiable {
     let id = UUID()
@@ -15,7 +16,12 @@ struct ProfileView: View {
     @State private var webViewData: WebViewData?
     @State private var isImageMenuOpen = false
     @State private var isUploading = false
-
+    // 2. ADD STATE VARIABLES FOR PHOTO SELECTION
+    @State private var showPhotosPicker = false
+    @State private var selectedPickerItem: PhotosPickerItem? = nil
+    @State private var profileImageData: Data? = nil
+    @State private var isPreviewOpen = false
+    
     var body: some View {
         
         
@@ -77,16 +83,32 @@ struct ProfileView: View {
                             )
                             .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
 
-                        // Smaller image inside the rounded rectangle
-                        Image(systemName: "person.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .padding(10) // Add padding to make it smaller
-                            .foregroundColor(.gray)
+                        // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
+                        if let data = viewModel.profileImageData, let uiImage = UIImage(data: data) {
+                            // Show the selected photo
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill() // Ensures photo fills the square
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12)) // Clips the overflowing image
+                        } else {
+                            // Smaller image inside the rounded rectangle
+                            Image(systemName: "person.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .padding(10) // Add padding to make it smaller
+                                .foregroundColor(.gray)
+                        }
                     }
                     .frame(width: 100, height: 100)
                     .onTapGesture {
-                        isImageMenuOpen = true
+                        if viewModel.profileImageData == nil {
+                            // Directly open picker if no profile image
+                            showPhotosPicker = true
+                        } else {
+                            // If image exists, open the menu
+                            isImageMenuOpen = true
+                        }
                     }
 
             
@@ -182,6 +204,22 @@ struct ProfileView: View {
             FullScreenModalView(url: data.url)
                 .edgesIgnoringSafeArea(.all)
         }
+        // 4. ATTACH THE PHOTO PICKER MODIFIER TO THE MAIN VIEW
+        .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPickerItem, matching: .images)
+        // 5. HANDLE DATA LOADING WHEN SELECTION CHANGES
+        .onChange(of: selectedPickerItem) { newItem in
+            Task {
+                // Retrieve data from the picked item
+                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                    // Update state on main thread
+                    await MainActor.run {
+                        viewModel.profileImageData = data
+                        self.isImageMenuOpen = false // Close the overlay menu
+                    }
+                    print("Image loaded successfully")
+                }
+            }
+        }
         .fullScreenCover(isPresented: $isImageMenuOpen) {
             ZStack {
 
@@ -209,25 +247,37 @@ struct ProfileView: View {
 
                     } else {
 
-                        // Image Help (mt-2)
+                        // Image Help
                         modalButton(title: "Image Help")
                             .padding(.top, 20)
 
-                        // Preview (mt-6)
+                        // Preview
                         modalButton(title: "Preview") {
-                            print("Preview tapped")
+                            isImageMenuOpen = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                isPreviewOpen = true
+                            }
                         }
                         .padding(.top, 24)
 
-                        // Remove (mt-6)
+                        // Remove
                         modalButton(title: "Remove") {
-                            print("Remove tapped")
+                            viewModel.profileImageData = nil
+                            selectedPickerItem = nil
+                            isImageMenuOpen = false
                         }
                         .padding(.top, 24)
 
-                        // Upload (mt-6)
+                        // Upload
                         modalButton(title: "Upload") {
-                            print("Upload tapped")
+                            // 1. Close the menu immediately
+                            isImageMenuOpen = false
+                            
+                            // 2. Add a tiny delay to allow the menu to dismiss cleanly
+                            // before the picker tries to present itself.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                showPhotosPicker = true
+                            }
                         }
                         .padding(.top, 24)
                     }
@@ -239,6 +289,56 @@ struct ProfileView: View {
                 .background(Color.clear)
             }
             .background(Color.clear)
+        }
+        .fullScreenCover(isPresented: $isPreviewOpen) {
+            
+            // Check if the image data exists before showing the preview
+            if let data = viewModel.profileImageData, let uiImage = UIImage(data: data) {
+                
+                ZStack {
+                    // 1. Full-screen background (like the white/black div in Next.js)
+                    Color.black.opacity(0.95)
+                        .ignoresSafeArea()
+                    
+                    // 2. The centered image
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                isPreviewOpen = false
+                                // Optional: Re-open the Image Menu for 'Image Help' or 'Remove'
+                                isImageMenuOpen = true
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .symbolRenderingMode(.hierarchical)
+                                    .font(.largeTitle)
+                                    .foregroundColor(.blue)
+                                    .foregroundStyle(.gray)
+                                    .padding(2)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+                // 4. Tap gesture on the whole view to close it and reopen the menu
+                .onTapGesture {
+                    isPreviewOpen = false
+                    // Re-open the Image Menu
+                    isImageMenuOpen = true
+                }
+                
+            } else {
+                // Fallback if image data is somehow missing
+                Text("No image to preview")
+                    .onAppear {
+                        isPreviewOpen = false // Close the preview if no image exists
+                    }
+            }
         }
     }
 }
@@ -375,6 +475,5 @@ func modalButton(title: String, action: (() -> Void)? = nil) -> some View {
             .foregroundColor(textColor)
     }
     .buttonStyle(.plain)
-    // 🚫 Disable any tap interaction for Image Help
     .allowsHitTesting(!isHelp)
 }

@@ -55,6 +55,8 @@ struct User {
         followers: Int,
         followings: Int,
         thoughts: Int,
+        profileMiniUrl: String?,
+        profileUrl: String?,
         bio: String?
     ) {
         self.username = username
@@ -63,6 +65,8 @@ struct User {
         self.followers = followers
         self.followings = followings   // FIX: map “following” → “followings”
         self.thoughts = thoughts
+        self.profileMiniUrl = profileMiniUrl
+        self.profileUrl = profileUrl
         self.bio = bio
 
         // Default optional values
