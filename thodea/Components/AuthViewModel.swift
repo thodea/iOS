@@ -22,6 +22,9 @@ class AuthViewModel: ObservableObject {
     @Published var layerOneLoaded: Bool = false
     @AppStorage("user_exists_in_firestore") var userExistsInFirestore: Bool?
     
+    // TEST
+    @Published var profileImageData: Data? = nil
+    
     init() {
         self.userSession = Auth.auth().currentUser
         // Check if userExistsInFirestore has been defined (is not nil)
@@ -197,6 +200,8 @@ class AuthViewModel: ObservableObject {
                 let registeredAt = userInfo["registeredAt"] as? Timestamp
                 let date = registeredAt?.dateValue() ?? Date()
                 let bio = userInfo["bio"] as? String
+                let profileMiniUrl = userInfo["profileMiniUrl"] as? String
+                let profileUrl = userInfo["profileUrl"] as? String
 
                 // Data from Realtime DB (with defaults)
                 let followers = userStats?["followers"] as? Int ?? 0
@@ -210,6 +215,8 @@ class AuthViewModel: ObservableObject {
                     followers: followers,
                     followings: followings,
                     thoughts: thoughts,
+                    profileMiniUrl: profileMiniUrl,
+                    profileUrl: profileUrl,
                     bio: bio
                 )
                 
