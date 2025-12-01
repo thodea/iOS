@@ -68,6 +68,14 @@ struct ContentView: View {
                     selectedNavItem = "login"
                 }
             }
+            .overlay {
+                // This assumes you have 'isUploading' and 'isDeleting' properties
+                // on your AuthViewModel. If not, adjust the binding.
+                GlobalOverlayView(
+                    isUploading: $authViewModel.isUploading,
+                    isDeleting: $authViewModel.isDeleting
+                )
+            }
         }.environmentObject(authViewModel)
     }
 }
