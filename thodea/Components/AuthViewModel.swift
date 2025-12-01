@@ -24,7 +24,11 @@ class AuthViewModel: ObservableObject {
     
     // TEST
     @Published var profileImageData: Data? = nil
+    @Published var profileImageExtension: String? = nil
     
+    @Published var isUploading: Bool = false
+    @Published var isDeleting: Bool = false
+
     init() {
         self.userSession = Auth.auth().currentUser
         // Check if userExistsInFirestore has been defined (is not nil)
@@ -220,6 +224,21 @@ class AuthViewModel: ObservableObject {
                     bio: bio
                 )
                 
+                if let profileUrlString = profileUrl,
+                   let url = URL(string: profileUrlString) {
+
+                    Task {
+                        do {
+                            let (data, _) = try await URLSession.shared.data(from: url)
+                            await MainActor.run {
+                                self.profileImageData = data
+                            }
+                        } catch {
+                            print("❌ Failed to download profile image: \(error)")
+                        }
+                    }
+                }
+                
                 self.userExistsInFirestore = true
                 self.isLoadingUser = false
             } else {
@@ -329,6 +348,57 @@ class AuthViewModel: ObservableObject {
             // you will need to prompt the user to re-authenticate.
         }
     }
+    
+    func removeProfileImage(skipLocalCleanup: Bool = false) async throws {
+            guard let username = currentUser?.username else { return }
+
+            // Build your API route like in Next.js
+            guard let url = URL(string: "https://thodea.com/api/deleteImageGCS") else { return }
+
+            // GCS API Request
+            let payload: [String: Any] = [
+                "query": ["username": username]
+            ]
+
+            let bodyData = try JSONSerialization.data(withJSONObject: payload)
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = bodyData
+
+            // Firestore reference
+            let db = Firestore.firestore()
+            let userRef = db.collection("user").document(username)
+
+            do {
+                // Run GCS deletion + Firestore field removals concurrently
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        _ = try await URLSession.shared.data(for: request)
+                    }
+                    group.addTask {
+                        try await userRef.updateData([
+                            "profileUrl": FieldValue.delete(),
+                            "profileMiniUrl": FieldValue.delete()
+                        ])
+                    }
+                    try await group.waitForAll()
+                }
+
+                // 🧹 Local state cleanup
+                await MainActor.run {
+                    if !skipLocalCleanup {
+                        self.profileImageData = nil
+                    }
+                    self.profileImageExtension = nil
+                }
+
+            } catch {
+                print("🚫 Error removing profile image: \(error)")
+                throw error
+            }
+        }
     
     @MainActor
     func fetchUser() async {

@@ -7,6 +7,7 @@
 
 import Foundation
 import AVKit
+import SwiftUI
 
 struct Thought: Identifiable {
     let id = UUID() // Optional unique identifier for SwiftUI's List or ForEach
@@ -142,3 +143,36 @@ let mockThought = Thought(
     firstUrl: nil, // Null maps to nil in Swift
     profileDeleted: nil // No profileDeleted info provided
 )
+
+struct GlobalOverlayView: View {
+    @Binding var isUploading: Bool
+    @Binding var isDeleting: Bool
+    
+    var body: some View {
+        if isUploading {
+            ZStack {
+                // Background dimmer - covers the whole screen including safe areas
+                Color(red: 17/255, green: 24/255, blue: 39/255)
+                    .ignoresSafeArea()
+                    .opacity(0.8)
+
+                // Alert box content
+                HStack(spacing: 12) { // 👈 Changed from VStack to HStack for one row
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        // Use a light color for visibility against the dark background
+                        .tint(.white)
+
+                    Text(isDeleting ? "Deleting" : "Uploading")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                }
+                .padding()
+                .cornerRadius(14)
+                .shadow(radius: 12)
+            }
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.15), value: isUploading)
+        }
+    }
+}
