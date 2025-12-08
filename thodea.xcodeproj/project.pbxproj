@@ -14,6 +14,8 @@
 		2C5D05FE2D210108004A6FE2 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 2C5D05FD2D210108004A6FE2 /* FirebaseFirestore */; };
 		2C699BB82EAEE3D8009C0812 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 2C699BB72EAEE3D8009C0812 /* GoogleSignIn */; };
 		2C699BBA2EAEE3D8009C0812 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 2C699BB92EAEE3D8009C0812 /* GoogleSignInSwift */; };
+		2C8F59042EE66FB2004E8163 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 2C8F59032EE66FB2004E8163 /* FirebaseMessaging */; };
+		2C8F59062EE66FB2004E8163 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 2C8F59052EE66FB2004E8163 /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,8 +51,10 @@
 			files = (
 				2C699BB82EAEE3D8009C0812 /* GoogleSignIn in Frameworks */,
 				2C5D05FC2D210108004A6FE2 /* FirebaseDatabase in Frameworks */,
+				2C8F59042EE66FB2004E8163 /* FirebaseMessaging in Frameworks */,
 				2C5D05FE2D210108004A6FE2 /* FirebaseFirestore in Frameworks */,
 				2C699BBA2EAEE3D8009C0812 /* GoogleSignInSwift in Frameworks */,
+				2C8F59062EE66FB2004E8163 /* FirebaseStorage in Frameworks */,
 				2C5D05FA2D210108004A6FE2 /* FirebaseCore in Frameworks */,
 				2C5D05F82D210108004A6FE2 /* FirebaseAuth in Frameworks */,
 			);
@@ -102,6 +106,8 @@
 				2C5D05FD2D210108004A6FE2 /* FirebaseFirestore */,
 				2C699BB72EAEE3D8009C0812 /* GoogleSignIn */,
 				2C699BB92EAEE3D8009C0812 /* GoogleSignInSwift */,
+				2C8F59032EE66FB2004E8163 /* FirebaseMessaging */,
+				2C8F59052EE66FB2004E8163 /* FirebaseStorage */,
 			);
 			productName = thodea;
 			productReference = 2CC5E0312D18F8830021A891 /* thodea.app */;
@@ -426,6 +432,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2C699BB62EAEE3D8009C0812 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		2C8F59032EE66FB2004E8163 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2C5D05F62D210108004A6FE2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		2C8F59052EE66FB2004E8163 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2C5D05F62D210108004A6FE2 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

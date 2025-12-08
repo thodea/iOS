@@ -117,53 +117,61 @@ struct ProfileView: View {
                         
                         
                         VStack() {
-                            HStack {
-                                let followers = viewModel.currentUser?.followers
-                                Text("\(formatNumber(followers ?? 0)) \(followers == 1 ? "follower" : "followers")")
-                                    .font(.system(size: 17)).fixedSize()
-                                
-                                Spacer() // Push the next elements to the right
-                                
-                                HStack(spacing: 0) {
-                                    // Blue line with width of 3
-                                    Rectangle()
-                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255)) // Line color
-                                        .frame(height: 3) // Line thickness
-                                        .padding(0)
+                            // 1. Followers Link
+                            NavigationLink(destination: FollowsView(
+                                username: viewModel.currentUser?.username ?? "",
+                                listType: "followers"
+                            )) {
+                                HStack {
+                                    let followers = abs(viewModel.currentUser?.followers ?? 0)
+                                    Text("\(formatNumber(followers)) \(followers == 1 ? "follower" : "followers")")
+                                        .font(.system(size: 17)).fixedSize()
                                     
-                                    // Small blue dot at the end of the line
-                                    Rectangle()
-                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
-                                        .frame(width: 8, height: 8, alignment: .trailing) // Size of the dot
-                                        .padding(0)
+                                    Spacer()
                                     
+                                    HStack(spacing: 0) {
+                                        Rectangle()
+                                            .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
+                                            .frame(height: 3)
+                                            .padding(0)
+                                        
+                                        Rectangle()
+                                            .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
+                                            .frame(width: 8, height: 8, alignment: .trailing)
+                                            .padding(0)
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
+                            .buttonStyle(.plain) // Prevents blue text coloring
                             
-                            
-                            HStack {
-                                Text("\(formatNumber(viewModel.currentUser?.followings ?? 0)) following")
-                                    .font(.system(size: 17)).fixedSize()
-                                
-                                Spacer() // Push the next elements to the right
-                                
-                                HStack(spacing: 0) {
-                                    // Blue line with width of 3
-                                    Rectangle()
-                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255)) // Line color
-                                        .frame(height: 3) // Line thickness
-                                        .padding(0)
+                            // 2. Following Link
+                            NavigationLink(destination: FollowsView(
+                                username: viewModel.currentUser?.username ?? "",
+                                listType: "following"
+                            )) {
+                                HStack {
+                                    Text("\(formatNumber(viewModel.currentUser?.followings ?? 0)) following")
+                                        .font(.system(size: 17)).fixedSize()
                                     
-                                    // Small blue dot at the end of the line
-                                    Rectangle()
-                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255)) // Dot color
-                                        .frame(width: 8, height: 8, alignment: .trailing) // Size of the dot
-                                        .padding(0)
+                                    Spacer()
                                     
+                                    HStack(spacing: 0) {
+                                        Rectangle()
+                                            .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
+                                            .frame(height: 3)
+                                            .padding(0)
+                                        
+                                        Rectangle()
+                                            .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
+                                            .frame(width: 8, height: 8, alignment: .trailing)
+                                            .padding(0)
+                                    }
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
+                            .buttonStyle(.plain) // Prevents blue text coloring
+
                         }
                         .padding(.leading, 12)
                     }
@@ -282,6 +290,7 @@ struct ProfileView: View {
                             modalButton(title: "Remove") {
                                 Task {
                                     do {
+                                        isImageMenuOpen = false
                                         await MainActor.run {authViewModel.isDeleting = true; authViewModel.isUploading = true }
                                         selectedPickerItem = nil
                                         try await authViewModel.removeProfileImage()

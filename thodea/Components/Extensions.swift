@@ -27,19 +27,25 @@ extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
 
 /// Formats a number into a string with k, m, b, or t suffix.
 func formatNumber(_ num: Int) -> String {
-    if num >= 1_000_000_000_000 {
-        return String(format: "%.1ft", Double(num) / 1_000_000_000_000).replacingOccurrences(of: ".0", with: "")
+    var number = num    // <-- make a mutable copy
+
+    if number < 0 {
+        number = -number
     }
-    if num >= 1_000_000_000 {
-        return String(format: "%.1fb", Double(num) / 1_000_000_000).replacingOccurrences(of: ".0", with: "")
+
+    if number >= 1_000_000_000_000 {
+        return String(format: "%.1ft", Double(number) / 1_000_000_000_000).replacingOccurrences(of: ".0", with: "")
     }
-    if num >= 1_000_000 {
-        return String(format: "%.1fm", Double(num) / 1_000_000).replacingOccurrences(of: ".0", with: "")
+    if number >= 1_000_000_000 {
+        return String(format: "%.1fb", Double(number) / 1_000_000_000).replacingOccurrences(of: ".0", with: "")
     }
-    if num >= 1_000 {
-        return String(format: "%.1fk", Double(num) / 1_000).replacingOccurrences(of: ".0", with: "")
+    if number >= 1_000_000 {
+        return String(format: "%.1fm", Double(number) / 1_000_000).replacingOccurrences(of: ".0", with: "")
     }
-    return "\(num)"
+    if number >= 1_000 {
+        return String(format: "%.1fk", Double(number) / 1_000).replacingOccurrences(of: ".0", with: "")
+    }
+    return "\(number)"
 }
 
 extension String {

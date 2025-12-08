@@ -176,3 +176,15 @@ struct GlobalOverlayView: View {
         }
     }
 }
+
+
+struct ProfileUserInfo: Identifiable, Codable {
+    var id: String { username } // Swift needs an ID for Lists
+    let username: String
+    var imageURL: String?
+    var deleted: Bool?
+    var followers: Int?
+    var thoughts: Int?
+    var followedAt: Date?
+}
+
