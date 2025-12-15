@@ -188,3 +188,81 @@ struct ProfileUserInfo: Identifiable, Codable {
     var followedAt: Date?
 }
 
+
+
+// MARK: - DateWithFormattedTimeView
+struct DateWithFormattedTimeView: View {
+    
+    // 1. Input: The initial date. This could be a Swift Date or a Unix timestamp (Double).
+    // Assuming the input is a Date object, which is cleaner in Swift.
+    // If your backend gives you an object with a 'seconds' property (like Firebase Timestamps),
+    // you'll need a small wrapper struct or to convert it to a Date beforehand.
+    // For this example, we'll assume it's a standard Swift Date object.
+    let date: Date
+    
+    // 2. State: The displayed time string, updated by the timer.
+    @State private var elapsedTimeString: String = ""
+    
+    // 3. Timer: Used to trigger the update function every second.
+    // We use a custom timer publisher.
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    // Initializer to set the initial state when the view is created
+    init(date: Date) {
+        self.date = date
+        // Initialize the state variable immediately upon creation
+        _elapsedTimeString = State(initialValue: formatElapsedTime(since: date))
+    }
+    
+    var body: some View {
+        Text(elapsedTimeString)
+            // Apply styling similar to the original component's className
+            .font(.caption) // Smaller font
+            .italic()       // Italic text
+            .frame(alignment: .trailing) // Adjust alignment if needed
+        
+        // 4. Timer Handling:
+        // When the timer fires, the .onReceive block executes updateTime().
+        // This is equivalent to the setInterval logic in React's useEffect.
+            .onReceive(timer) { _ in
+                updateTime()
+            }
+            // Use .onAppear to ensure the initial value is calculated correctly,
+            // though we already did this in the init. It's good practice.
+            .onAppear {
+                updateTime()
+            }
+    }
+    
+    // MARK: - Helper Functions
+    
+    /// Updates the `elapsedTimeString` state property with the new formatted time.
+    private func updateTime() {
+        self.elapsedTimeString = formatElapsedTime(since: self.date)
+    }
+    
+    /// Converts the elapsed time into a human-readable "time ago" string.
+    /// - Parameter date: The original date/time of the comment.
+    /// - Returns: A string like "5 minutes ago".
+    private func formatElapsedTime(since date: Date) -> String {
+        // TimeInterval is a Double representing the time in seconds between two Dates.
+        let timeInterval = Date().timeIntervalSince(date)
+        let seconds = Int(timeInterval)
+        
+        // The original logic handles cases by checking from largest to smallest unit.
+        
+        let minutes = seconds / 60
+        let hours = minutes / 60
+        let days = hours / 24
+        
+        if days > 0 {
+            return days == 1 ? "\(days) day ago" : "\(days) days ago"
+        } else if hours > 0 {
+            return hours == 1 ? "\(hours) hour ago" : "\(hours) hours ago"
+        } else if minutes > 0 {
+            return minutes == 1 ? "\(minutes) minute ago" : "\(minutes) minutes ago"
+        } else {
+            return seconds == 1 ? "\(seconds) second ago" : "\(seconds) seconds ago"
+        }
+    }
+}

@@ -120,7 +120,8 @@ struct ProfileView: View {
                             // 1. Followers Link
                             NavigationLink(destination: FollowsView(
                                 username: viewModel.currentUser?.username ?? "",
-                                listType: "followers"
+                                listType: "followers",
+                                dateDisabled: false
                             )) {
                                 HStack {
                                     let followers = abs(viewModel.currentUser?.followers ?? 0)
@@ -148,7 +149,8 @@ struct ProfileView: View {
                             // 2. Following Link
                             NavigationLink(destination: FollowsView(
                                 username: viewModel.currentUser?.username ?? "",
-                                listType: "following"
+                                listType: "following",
+                                dateDisabled: false
                             )) {
                                 HStack {
                                     Text("\(formatNumber(viewModel.currentUser?.followings ?? 0)) following")

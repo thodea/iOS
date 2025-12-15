@@ -35,6 +35,31 @@ class FollowListViewModel: ObservableObject {
 struct FollowsView: View {
     let username: String
     let listType: String // "followers" or "following"
+    let dateDisabled: Bool
+    var mockUsers: [ProfileUserInfo] = [
+            ProfileUserInfo(
+                username: "MockUser_1",
+                imageURL: nil,
+                followers: 150,
+                thoughts: 12,
+                followedAt: Date() // 1 day ago
+            ),
+            ProfileUserInfo(
+                username: "Design_Guru",
+                imageURL: nil,
+                followers: 2300,
+                thoughts: 89,
+                followedAt: Date().addingTimeInterval(-60 * 3) // 7 days ago
+            ),
+            ProfileUserInfo(
+                username: "SwiftUI_Fan",
+                imageURL: nil,
+                followers: 45,
+                thoughts: 2,
+                followedAt: Date().addingTimeInterval(-60 * 60 * 24 * 30) // 30 days ago
+            )
+        ]
+    
     var users: [ProfileUserInfo] = []
     private let service = FollowService()
     @StateObject private var vm = FollowListViewModel()
@@ -59,38 +84,126 @@ struct FollowsView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
 
+                        //[PROD] ForEach(vm.users) { userInfo in
                         ForEach(vm.users) { userInfo in
-                            HStack(spacing: 12) {
-
-                                // Profile image
-                                if let url = userInfo.imageURL, let imageURL = URL(string: url) {
-                                    AsyncImage(url: imageURL) { img in
-                                        img.resizable()
-                                            .scaledToFill()
-                                    } placeholder: {
-                                        Color.gray.opacity(0.2)
+                            let isDeleted = userInfo.deleted ?? false
+                                
+                                // Card Container
+                                // Equivalent to: div onClick... className="... shadow-md border rounded-lg ..."
+                                Button(action: {
+                                    if !isDeleted {
+                                        // navProfile(profile.username)
+                                        print("Navigate to \(userInfo.username)")
                                     }
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                                } else {
-                                    Circle()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(width: 40, height: 40)
+                                }) {
+                                    VStack(spacing: 0) {
+                                        
+                                        // --- Top Section (Image | Info | Stats) ---
+                                        HStack(spacing: 0) {
+                                            
+                                            // 1. Profile Image Section
+                                            // Equivalent to: w-[40px] h-[40px] rounded-md
+                                            Group {
+                                                if let urlString = userInfo.imageURL, let url = URL(string: urlString) {
+                                                    AsyncImage(url: url) { image in
+                                                        image
+                                                            .resizable()
+                                                            .aspectRatio(contentMode: .fill)
+                                                            .frame(width: 40, height: 40)
+                                                            .clipShape(RoundedRectangle(cornerRadius: 6)) // rounded-md
+                                                            .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                                                    } placeholder: {
+                                                        Color.gray.opacity(0.2)
+                                                            .frame(width: 40, height: 40)
+                                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                                    }
+                                                } else {
+                                                    // Fallback "Skeleton" Style
+                                                    // Matches the div with gray-400 dots inside
+                                                    ZStack {
+                                                        RoundedRectangle(cornerRadius: 6)
+                                                            .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                                                            .background(Color.clear)
+                                                        
+                                                        VStack(spacing: 4) {
+                                                            Capsule().fill(Color.gray.opacity(0.5)).frame(width: 8, height: 8)
+                                                            Capsule().fill(Color.gray.opacity(0.5)).frame(width: 12, height: 8)
+                                                        }
+                                                    }
+                                                    .frame(width: 40, height: 40)
+                                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                                }
+                                            }
+                                            .padding(.trailing, 8) // pl-2 pr-2 logic
+                                            
+                                            // 2. Center Info: Username | Thoughts
+                                            HStack(alignment: .center, spacing: 6) {
+                                                Text(userInfo.username)
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                                
+                                                Text("|")
+                                                    .font(.system(size: 16))
+                                                    .opacity(0.45)
+                                                    .foregroundColor(Color(red: 107 / 255, green: 114 / 255, blue: 128 / 255))
+                                                
+                                                // Thoughts Count
+                                                Text(formatNumber(userInfo.thoughts ?? 0))
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            // 3. Right Stats: Followers + Blue Icon
+                                            HStack(spacing: 4) {
+                                                Text(formatNumber(userInfo.followers ?? 0))
+                                                    .font(.system(size: 16))
+                                                    .foregroundColor(Color(red: 107 / 255, green: 114 / 255, blue: 128 / 255)) // text-gray-500
+                                                
+                                                // SVG Replacement: Closest SF Symbol to the user group icon
+                                                Image(systemName: "person.2.fill")
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                                    .frame(width: 20, height: 20)
+                                                    // dark:text-blue-600 text-blue-400
+                                                    .foregroundColor(Color.blue.opacity(0.8))
+                                            }
+                                        }
+                                        .frame(minHeight: 50)
+                                        .padding(.horizontal, 8)
+                                        .padding(.top, 3)
+
+                                        // Adjust bottom padding if date is shown or not
+                                        
+                                        // --- Bottom Section (Date) ---
+                                        if !dateDisabled {
+                                            HStack(spacing: 0) {
+                                                Spacer()
+                                                // Equivalent to: <DateWithFormattedTime ... />
+                                                if let date = userInfo.followedAt {
+                                                    DateWithFormattedTimeView(date: date)
+                                                        .font(.caption)
+                                                        .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                                }
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.bottom, 2)
+                                        }
+                                    }
+                                    .background(Color(red: 17/255, green: 24/255, blue: 39/255))
+                                    .cornerRadius(8) // rounded-lg
+                                    // Border logic: dark:border-gray-800
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+                                    )
+                                    // Shadow logic: shadow-md
+                                    .shadow(color: Color.black.opacity(0.5), radius: 3, x: 0, y: 2)
                                 }
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(userInfo.username)
-                                        .font(.system(size: 16, weight: .semibold))
-                                        .foregroundColor(.white)
-
-                                    Text("\(userInfo.followers ?? 0) followers • \(userInfo.thoughts ?? 0) thoughts")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.white.opacity(0.6))
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.vertical, 6)
+                                .buttonStyle(PlainButtonStyle()) // Removes default tap gray-out
+                                .disabled(isDeleted)
+                                .opacity(isDeleted ? 0.6 : 1.0) // Visual cue for deleted
                         }
                     }
                 }
@@ -108,7 +221,8 @@ struct FollowsView: View {
                 await vm.loadInitial(username: username, listType: listType)
             }
         }
-        .padding()
+        .padding(.horizontal)
+        .padding(.top, 2)
         .frame(maxWidth: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
         .foregroundColor(.white.opacity(0.9))
         .navigationBarBackButtonHidden(true) // Hides the default back button
@@ -146,6 +260,8 @@ struct FollowsView: View {
 // Preview structure for development environment
 
 #Preview {
-    FollowsView(username: "JohnDoe", listType: "followers")
+    
+    FollowsView(username: "JohnDoe", listType: "followers",
+                dateDisabled: false)
         .environmentObject(AuthViewModel())
 }
