@@ -14,10 +14,21 @@ import FirebaseFirestore
 @MainActor
 class FollowListViewModel: ObservableObject {
     @Published var users: [ProfileUserInfo] = []
-
+    @Published var isLoading: Bool = false // 1. Added loading state
+    
     private let service = FollowService()
+    private let cache = FollowCache.shared
 
     func loadInitial(username: String, listType: String) async {
+        
+        if let cachedUsers = cache.get(username: username, type: listType) {
+            self.users = cachedUsers
+            // Optional: return early if you don't want to refresh,
+            // or continue to fetch "fresh" data in the background.
+            return
+        }
+
+        isLoading = true // 2. Start loading
         do {
             let result = try await service.getFollow(
                 user: username,
@@ -26,9 +37,11 @@ class FollowListViewModel: ObservableObject {
                 snap: nil
             )
             self.users = result
+            cache.save(username: username, type: listType, users: result)
         } catch {
             print("❌ Follow load error:", error)
         }
+        isLoading = false // 3. Stop loading
     }
 }
 
@@ -81,12 +94,13 @@ struct FollowsView: View {
             VStack(alignment: .leading, spacing: 0) {
 
                 // 🔹 LIST OF FOLLOWERS/FOLLOWING
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-
-                        //[PROD] ForEach(vm.users) { userInfo in
-                        ForEach(vm.users) { userInfo in
-                            let isDeleted = userInfo.deleted ?? false
+                ZStack(alignment: .top) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            
+                            //[PROD] ForEach(vm.users) { userInfo in
+                            ForEach(vm.users) { userInfo in
+                                let isDeleted = userInfo.deleted ?? false
                                 
                                 // Card Container
                                 // Equivalent to: div onClick... className="... shadow-md border rounded-lg ..."
@@ -166,14 +180,14 @@ struct FollowsView: View {
                                                     .resizable()
                                                     .aspectRatio(contentMode: .fit)
                                                     .frame(width: 20, height: 20)
-                                                    // dark:text-blue-600 text-blue-400
+                                                // dark:text-blue-600 text-blue-400
                                                     .foregroundColor(Color.blue.opacity(0.8))
                                             }
                                         }
                                         .frame(minHeight: 50)
                                         .padding(.horizontal, 8)
                                         .padding(.top, 3)
-
+                                        
                                         // Adjust bottom padding if date is shown or not
                                         
                                         // --- Bottom Section (Date) ---
@@ -204,11 +218,19 @@ struct FollowsView: View {
                                 .buttonStyle(PlainButtonStyle()) // Removes default tap gray-out
                                 .disabled(isDeleted)
                                 .opacity(isDeleted ? 0.6 : 1.0) // Visual cue for deleted
+                            }
                         }
                     }
+                    
+                    // 2. The Loader layer (on top)
+                    if vm.isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                            .scaleEffect(1.5)
+                            .padding(.top, 10) // Adjust this to position it exactly where you want
+                    }
+                    
                 }
-
-                Spacer() // Pushes content to the top
             }
 
             .frame(maxWidth: 700) // max-w-[700px]
