@@ -23,7 +23,8 @@ class FollowListViewModel: ObservableObject {
     private let service = FollowService()
     private let cache = FollowCache.shared
     private let pageSize = 4 // As requested
-
+    private let maxHardLimit = 50 // 🎯 The Hard Limit
+    
     func loadInitial(username: String, listType: String) async {
         // 🔒 Prevent reloading if we already have data
         guard !didLoadOnce else { return }
@@ -39,10 +40,10 @@ class FollowListViewModel: ObservableObject {
         // 2. Check Cache
         // 1. Check Cache first
         if let cachedData = cache.get(username: username, type: listType) {
-            self.users = cachedData.users
+            self.users = Array(cachedData.users.prefix(maxHardLimit))
             self.lastDocument = cachedData.lastDocument
             // If we have fewer than pageSize, we know there's no more to load
-            self.hasMore = cachedData.users.count >= pageSize
+            self.hasMore = self.users.count < maxHardLimit && (cachedData.users.count >= pageSize)
             
             isLoadingInitial = false
             return // Exit early because we have everything we need
@@ -59,11 +60,12 @@ class FollowListViewModel: ObservableObject {
             self.users = fetchedUsers
             self.lastDocument = lastDoc
             self.cache.save(username: username, type: listType, users: fetchedUsers, lastDoc: lastDoc)
-            // If we got fewer items than requested, we've reached the end
-            if fetchedUsers.count < pageSize {
+
+            if self.users.count >= maxHardLimit || fetchedUsers.count < pageSize {
                 self.hasMore = false
+            } else {
+                self.hasMore = fetchedUsers.count == pageSize
             }
-            self.hasMore = fetchedUsers.count == pageSize
         } catch {
             print("❌ Initial load error:", error)
         }
@@ -72,16 +74,22 @@ class FollowListViewModel: ObservableObject {
     }
     
     func loadMore(username: String, listType: String) async {
-        guard !isLoadingMore, hasMore, !isLoadingInitial else { return }
-        
+        guard !isLoadingMore, hasMore, !isLoadingInitial, users.count < maxHardLimit else {
+            self.hasMore = false
+            return
+        }
         isLoadingMore = true
         print("⚡️ Triggering Load More...")
 
         do {
+            // Calculate how many more we are allowed to fetch to not exceed 8
+            let remainingSpace = maxHardLimit - users.count
+            let limitToFetch = min(pageSize, remainingSpace)
+
             let (newUsers, lastDoc) = try await service.getFollow(
                 user: username,
                 type: listType,
-                maxLim: pageSize,
+                maxLim: limitToFetch,
                 snap: self.lastDocument
             )
             
@@ -99,9 +107,9 @@ class FollowListViewModel: ObservableObject {
                                lastDoc: lastDoc)
             }
             
-            if newUsers.count < pageSize {
+
+            if self.users.count >= maxHardLimit || newUsers.count < limitToFetch {
                 self.hasMore = false
-                print("🏁 End of list reached")
             }
             
         } catch {
