@@ -6,19 +6,25 @@
 //
 
 import SwiftUI // or import Combine
+import FirebaseFirestore
 
 @MainActor
 class FollowCache: ObservableObject {
-    static let shared = FollowCache() // Singleton for easy access
+    static let shared = FollowCache()
     
-    // Key format: "username_followers" or "username_following"
-    @Published var storage: [String: [ProfileUserInfo]] = [:]
+    // Create a small container for our cached data
+    struct CachedFollowData {
+        let users: [ProfileUserInfo]
+        let lastDocument: DocumentSnapshot?
+    }
     
-    func get(username: String, type: String) -> [ProfileUserInfo]? {
+    @Published var storage: [String: CachedFollowData] = [:]
+    
+    func get(username: String, type: String) -> CachedFollowData? {
         return storage["\(username)_\(type)"]
     }
     
-    func save(username: String, type: String, users: [ProfileUserInfo]) {
-        storage["\(username)_\(type)"] = users
+    func save(username: String, type: String, users: [ProfileUserInfo], lastDoc: DocumentSnapshot?) {
+        storage["\(username)_\(type)"] = CachedFollowData(users: users, lastDocument: lastDoc)
     }
 }

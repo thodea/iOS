@@ -14,34 +14,101 @@ import FirebaseFirestore
 @MainActor
 class FollowListViewModel: ObservableObject {
     @Published var users: [ProfileUserInfo] = []
-    @Published var isLoading: Bool = false // 1. Added loading state
-    
+    @Published var isLoadingInitial: Bool = false
+    @Published var isLoadingMore: Bool = false
+    @Published var hasMore: Bool = true // Assume true initially
+    @Published var didLoadOnce = false
+
+    private var lastDocument: DocumentSnapshot? = nil
     private let service = FollowService()
     private let cache = FollowCache.shared
+    private let pageSize = 4 // As requested
 
     func loadInitial(username: String, listType: String) async {
+        // 🔒 Prevent reloading if we already have data
+        guard !didLoadOnce else { return }
+        didLoadOnce = true
+
+        isLoadingInitial = true
         
-        if let cachedUsers = cache.get(username: username, type: listType) {
-            self.users = cachedUsers
-            // Optional: return early if you don't want to refresh,
-            // or continue to fetch "fresh" data in the background.
-            return
+        // 1. Reset pagination state on refresh/initial load
+        self.users = []
+        self.lastDocument = nil
+        self.hasMore = true
+        
+        // 2. Check Cache
+        // 1. Check Cache first
+        if let cachedData = cache.get(username: username, type: listType) {
+            self.users = cachedData.users
+            self.lastDocument = cachedData.lastDocument
+            // If we have fewer than pageSize, we know there's no more to load
+            self.hasMore = cachedData.users.count >= pageSize
+            
+            isLoadingInitial = false
+            return // Exit early because we have everything we need
         }
 
-        isLoading = true // 2. Start loading
         do {
-            let result = try await service.getFollow(
+            let (fetchedUsers, lastDoc) = try await service.getFollow(
                 user: username,
                 type: listType,
-                maxLim: 4,
+                maxLim: pageSize,
                 snap: nil
             )
-            self.users = result
-            cache.save(username: username, type: listType, users: result)
+            
+            self.users = fetchedUsers
+            self.lastDocument = lastDoc
+            self.cache.save(username: username, type: listType, users: fetchedUsers, lastDoc: lastDoc)
+            // If we got fewer items than requested, we've reached the end
+            if fetchedUsers.count < pageSize {
+                self.hasMore = false
+            }
+            self.hasMore = fetchedUsers.count == pageSize
         } catch {
-            print("❌ Follow load error:", error)
+            print("❌ Initial load error:", error)
         }
-        isLoading = false // 3. Stop loading
+        
+        isLoadingInitial = false
+    }
+    
+    func loadMore(username: String, listType: String) async {
+        guard !isLoadingMore, hasMore, !isLoadingInitial else { return }
+        
+        isLoadingMore = true
+        print("⚡️ Triggering Load More...")
+
+        do {
+            let (newUsers, lastDoc) = try await service.getFollow(
+                user: username,
+                type: listType,
+                maxLim: pageSize,
+                snap: self.lastDocument
+            )
+            
+            if !newUsers.isEmpty {
+                // 1. Append new users to the existing local list
+                self.users.append(contentsOf: newUsers)
+                self.lastDocument = lastDoc
+                
+                // 2. 🔥 CACHE THE ENTIRE UPDATED LIST
+                // We save the full 'self.users' array so the cache stays in sync
+                // with the UI state.
+                self.cache.save(username: username,
+                               type: listType,
+                               users: self.users,
+                               lastDoc: lastDoc)
+            }
+            
+            if newUsers.count < pageSize {
+                self.hasMore = false
+                print("🏁 End of list reached")
+            }
+            
+        } catch {
+            print("❌ Load more error:", error)
+        }
+        
+        isLoadingMore = false
     }
 }
 
@@ -98,144 +165,84 @@ struct FollowsView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
                             
-                            //[PROD] ForEach(vm.users) { userInfo in
-                            ForEach(vm.users) { userInfo in
+                            if vm.isLoadingInitial && vm.users.isEmpty {
+                                ProgressView()
+                                    .tint(.blue)
+                                    .scaleEffect(1.2)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            //[PROD] ForEach(vm.users) { userInfo in mockUsers
+                            // 🔹 THE LOOP
+                            ForEach(Array(vm.users.enumerated()), id: \.element.id) { index, userInfo in
                                 let isDeleted = userInfo.deleted ?? false
                                 
-                                // Card Container
-                                // Equivalent to: div onClick... className="... shadow-md border rounded-lg ..."
                                 Button(action: {
                                     if !isDeleted {
-                                        // navProfile(profile.username)
                                         print("Navigate to \(userInfo.username)")
                                     }
                                 }) {
-                                    VStack(spacing: 0) {
-                                        
-                                        // --- Top Section (Image | Info | Stats) ---
-                                        HStack(spacing: 0) {
-                                            
-                                            // 1. Profile Image Section
-                                            // Equivalent to: w-[40px] h-[40px] rounded-md
-                                            Group {
-                                                if let urlString = userInfo.imageURL, let url = URL(string: urlString) {
-                                                    AsyncImage(url: url) { image in
-                                                        image
-                                                            .resizable()
-                                                            .aspectRatio(contentMode: .fill)
-                                                            .frame(width: 40, height: 40)
-                                                            .clipShape(RoundedRectangle(cornerRadius: 6)) // rounded-md
-                                                            .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
-                                                    } placeholder: {
-                                                        Color.gray.opacity(0.2)
-                                                            .frame(width: 40, height: 40)
-                                                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                                                    }
-                                                } else {
-                                                    // Fallback "Skeleton" Style
-                                                    // Matches the div with gray-400 dots inside
-                                                    ZStack {
-                                                        RoundedRectangle(cornerRadius: 6)
-                                                            .stroke(Color.gray.opacity(0.4), lineWidth: 1)
-                                                            .background(Color.clear)
-                                                        
-                                                        VStack(spacing: 4) {
-                                                            Capsule().fill(Color.gray.opacity(0.5)).frame(width: 8, height: 8)
-                                                            Capsule().fill(Color.gray.opacity(0.5)).frame(width: 12, height: 8)
-                                                        }
-                                                    }
-                                                    .frame(width: 40, height: 40)
-                                                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-                                                }
-                                            }
-                                            .padding(.trailing, 8) // pl-2 pr-2 logic
-                                            
-                                            // 2. Center Info: Username | Thoughts
-                                            HStack(alignment: .center, spacing: 6) {
-                                                Text(userInfo.username)
-                                                    .font(.system(size: 16, weight: .semibold))
-                                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                                                
-                                                Text("|")
-                                                    .font(.system(size: 16))
-                                                    .opacity(0.45)
-                                                    .foregroundColor(Color(red: 107 / 255, green: 114 / 255, blue: 128 / 255))
-                                                
-                                                // Thoughts Count
-                                                Text(formatNumber(userInfo.thoughts ?? 0))
-                                                    .font(.system(size: 16))
-                                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            // 3. Right Stats: Followers + Blue Icon
-                                            HStack(spacing: 4) {
-                                                Text(formatNumber(userInfo.followers ?? 0))
-                                                    .font(.system(size: 16))
-                                                    .foregroundColor(Color(red: 107 / 255, green: 114 / 255, blue: 128 / 255)) // text-gray-500
-                                                
-                                                // SVG Replacement: Closest SF Symbol to the user group icon
-                                                Image(systemName: "person.2.fill")
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fit)
-                                                    .frame(width: 20, height: 20)
-                                                // dark:text-blue-600 text-blue-400
-                                                    .foregroundColor(Color.blue.opacity(0.8))
-                                            }
-                                        }
-                                        .frame(minHeight: 50)
-                                        .padding(.horizontal, 8)
-                                        .padding(.top, 3)
-                                        
-                                        // Adjust bottom padding if date is shown or not
-                                        
-                                        // --- Bottom Section (Date) ---
-                                        if !dateDisabled {
-                                            HStack(spacing: 0) {
-                                                Spacer()
-                                                // Equivalent to: <DateWithFormattedTime ... />
-                                                if let date = userInfo.followedAt {
-                                                    DateWithFormattedTimeView(date: date)
-                                                        .font(.caption)
-                                                        .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                                                }
-                                            }
-                                            .padding(.horizontal, 8)
-                                            .padding(.bottom, 2)
+                                    UserRowView(userInfo: userInfo, dateDisabled: dateDisabled)
+                                }
+                                .padding(.horizontal)
+                                .buttonStyle(PlainButtonStyle())
+                                .disabled(isDeleted)
+                                .opacity(isDeleted ? 0.6 : 1.0)
+                                // 👇 MAGIC HAPPENS HERE
+                                .onAppear {
+                                    // Trigger load when the user sees the 3rd to last item
+                                    // This creates a "smooth" infinite scroll effect
+                                    if index == vm.users.count - 1 && vm.hasMore {
+                                        Task {
+                                            await vm.loadMore(username: username, listType: listType)
                                         }
                                     }
-                                    .background(Color(red: 17/255, green: 24/255, blue: 39/255))
-                                    .cornerRadius(8) // rounded-lg
-                                    // Border logic: dark:border-gray-800
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-                                    )
-                                    // Shadow logic: shadow-md
-                                    .shadow(color: Color.black.opacity(0.5), radius: 3, x: 0, y: 2)
                                 }
-                                .buttonStyle(PlainButtonStyle()) // Removes default tap gray-out
-                                .disabled(isDeleted)
-                                .opacity(isDeleted ? 0.6 : 1.0) // Visual cue for deleted
+                            }
+                            
+                            if vm.isLoadingMore {
+                                ProgressView()
+                                    .tint(.blue)
+                                    .scaleEffect(1.2)
+                                    .frame(maxWidth: .infinity)
                             }
                         }
+                        .padding(.bottom, 20)
                     }
                     
-                    // 2. The Loader layer (on top)
-                    if vm.isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-                            .scaleEffect(1.5)
-                            .padding(.top, 10) // Adjust this to position it exactly where you want
-                    }
+                    // 2. The "Load More" Footer & Threshold Trigger
+                    /*if vm.hasMore {
+                        GeometryReader { geo -> Color in
+                            let bottomPos = geo.frame(in: .global).maxY
+                            let minY = geo.frame(in: .global).minY
+                            let height = UIScreen.main.bounds.height
+                            let threshold = height + 300 // The 300px threshold
+                            let diff = bottomPos - height
+                            // TRACING
+                            // If the footer position (minY) is less than ScreenHeight + 300,
+                            // it means the footer is within 300px of entering the screen (or is already on screen).
+                            
+                            DispatchQueue.main.async {
+                                if diff < 600 {
+                                    // Trace
+                                    print("📉 Scroll Trace: Footer Y (\(Int(diff))) < Threshold (\(Int(600))) -> LOADING")
+                                    
+                                    Task {
+                                        await vm.loadMore(username: username, listType: listType)
+                                    }
+                                }
+                            }
+                            return Color.clear
+                        }
+                        .frame(height: 50) // Give the reader some height
+                    }*/
                     
                 }
+                .padding(.bottom, 32)
+
             }
-
-            .frame(maxWidth: 700) // max-w-[700px]
-
-            Spacer() // Pushes the whole block to the top of the view
+            .frame(maxWidth: .infinity, maxHeight: .infinity) // <--- Add maxHeight here
+            .ignoresSafeArea()
+            //Spacer() // Pushes the whole block to the top of the view
 
         }
         .onAppear {
@@ -243,7 +250,7 @@ struct FollowsView: View {
                 await vm.loadInitial(username: username, listType: listType)
             }
         }
-        .padding(.horizontal)
+        //.padding(.horizontal)
         .padding(.top, 2)
         .frame(maxWidth: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
         .foregroundColor(.white.opacity(0.9))
@@ -286,4 +293,83 @@ struct FollowsView: View {
     FollowsView(username: "JohnDoe", listType: "followers",
                 dateDisabled: false)
         .environmentObject(AuthViewModel())
+}
+
+
+// Extracted Row View to keep main body clean
+struct UserRowView: View {
+    let userInfo: ProfileUserInfo
+    let dateDisabled: Bool
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                // 1. Profile Image
+                Group {
+                    if let urlString = userInfo.imageURL, let url = URL(string: urlString) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.gray.opacity(0.2)
+                        }
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                            VStack(spacing: 4) {
+                                Capsule().fill(Color.gray.opacity(0.5)).frame(width: 8, height: 8)
+                                Capsule().fill(Color.gray.opacity(0.5)).frame(width: 12, height: 8)
+                            }
+                        }
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.trailing, 8)
+                
+                // 2. Info
+                HStack(alignment: .center, spacing: 6) {
+                    Text(userInfo.username)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                    Text("|").font(.system(size: 16)).opacity(0.45)
+                    Text(formatNumber(userInfo.thoughts ?? 0)) // Simplified format for brevity
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                }
+                
+                Spacer()
+                
+                // 3. Stats
+                HStack(spacing: 4) {
+                    Text(formatNumber(userInfo.followers ?? 0))
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 107 / 255, green: 114 / 255, blue: 128 / 255))
+                    Image(systemName: "person.2.fill")
+                        .resizable().aspectRatio(contentMode: .fit).frame(width: 20, height: 20)
+                        .foregroundColor(Color.blue.opacity(0.8))
+                }
+            }
+            .frame(minHeight: 50)
+            .padding(.horizontal, 8)
+            .padding(.top, 3)
+            
+            if !dateDisabled, let date = userInfo.followedAt {
+                HStack {
+                    Spacer()
+                    DateWithFormattedTimeView(date: date) // Simplified date
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 2)
+            }
+        }
+        
+        .background(Color(red: 17/255, green: 24/255, blue: 39/255))
+        .cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.1), lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.5), radius: 3, x: 0, y: 2)
+        //.padding(.bottom, 200)
+    }
 }

@@ -24,7 +24,7 @@ struct Loader: View {
                     ZStack {
                         // Spinning border ring
                         Circle()
-                            .strokeBorder(Color(.systemBlue).opacity(0.8), lineWidth: 1)
+                            .strokeBorder(Color(.systemBlue).opacity(0.2), lineWidth: 1)
                        
                         // Rotating blue dot
                         Circle()
