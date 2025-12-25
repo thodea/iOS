@@ -20,8 +20,8 @@ final class FollowService {
     func getFollow(user: String,
                    type: String,
                    maxLim: Int,
-                   snap: Timestamp? = nil) async throws -> [ProfileUserInfo] {
-
+                   snap: DocumentSnapshot? = nil) async throws -> ([ProfileUserInfo], DocumentSnapshot?) {
+        
         // 1. Base query
         var query: Query = fdb
             .collection("user")
@@ -31,12 +31,18 @@ final class FollowService {
             .limit(to: maxLim)
 
         // 2. If snap exists → startAfter
-        if let snapTime = snap {
-            query = query.start(after: [snapTime])
+        if let doc = snap {
+            query = query.start(afterDocument: doc)
         }
 
         // 3. Execute Firestore query
         let snapshot = try await query.getDocuments()
+        
+        // If empty, return empty early
+        if snapshot.documents.isEmpty {
+            return ([], nil)
+        }
+
         var arr = try snapshot.documents.compactMap { doc -> ProfileUserInfo? in
             return try doc.data(as: ProfileUserInfo.self)
         }
@@ -65,6 +71,6 @@ final class FollowService {
             arr[i].thoughts = thoughtsSnap.value as? Int ?? 0
         }
 
-        return arr
+        return (arr, snapshot.documents.last)
     }
 }
