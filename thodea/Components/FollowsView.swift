@@ -184,16 +184,13 @@ struct FollowsView: View {
                             ForEach(Array(vm.users.enumerated()), id: \.element.id) { index, userInfo in
                                 let isDeleted = userInfo.deleted ?? false
                                 
-                                Button(action: {
-                                    if !isDeleted {
-                                        print("Navigate to \(userInfo.username)")
-                                    }
-                                }) {
+                                // Wrap the row directly in the Link
+                                NavigationLink(destination: ProfileUserView(username: userInfo.username)) {
                                     UserRowView(userInfo: userInfo, dateDisabled: dateDisabled)
                                 }
-                                .padding(.horizontal)
-                                .buttonStyle(PlainButtonStyle())
+                                .buttonStyle(PlainButtonStyle()) // Prevents the blue highlight effect
                                 .disabled(isDeleted)
+                                .padding(.horizontal)
                                 .opacity(isDeleted ? 0.6 : 1.0)
                                 // 👇 MAGIC HAPPENS HERE
                                 .onAppear {
