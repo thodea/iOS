@@ -189,6 +189,18 @@ struct ProfileUserInfo: Identifiable, Codable {
 }
 
 
+struct ProfileInfo: Identifiable, Codable {
+    var id: String { username } // Swift needs an ID for Lists
+    var username: String
+    var bio: String?
+    var profileUrl: String?
+    var profileMiniUrl: String?
+    var followers: Int
+    var following: Int
+    var thoughts: Int // Assuming this exists based on your UI
+    var isFollowing: Bool = false
+}
+
 
 // MARK: - DateWithFormattedTimeView
 struct DateWithFormattedTimeView: View {
