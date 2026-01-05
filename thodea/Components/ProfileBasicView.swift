@@ -7,7 +7,9 @@
 
 import SwiftUI
 import PhotosUI
-
+import Firebase // Ensure you have Firebase imports for the fetch logic
+import FirebaseDatabase
+import FirebaseFirestore
 
 struct ProfileBasicView: View {
     let username: String
@@ -27,7 +29,50 @@ struct ProfileBasicView: View {
     @State private var profileImageData: Data? = nil
     @State private var isPreviewOpen = false
     let uploadService = UploadService(signedPostEndpoint: URL(string: "https://thodea.com/api/uploadURL")!)
+    
+    @State private var isLoading: Bool = true
+    // 1. Check if we are looking at our own profile
+    var isCurrentUser: Bool {
+        return viewModel.currentUser?.username == username
+    }
+    @State private var fetchedUser: ProfileInfo?
+    @State private var fetchedProfileImageData: Data?
     //@State private var isDeleting = false
+
+    private var hasProfileUrl: Bool {
+        if isCurrentUser {
+            // If it's me, check my local view model
+            guard let url = viewModel.currentUser?.profileUrl else { return false }
+            return !url.isEmpty
+        } else {
+            // If it's another user:
+            // 1. If fetchedUser is nil, we are still loading profile info -> Return true (Wait)
+            // 2. If fetchedUser is loaded, check if they have a URL
+            guard let user = fetchedUser else { return true }
+            guard let url = user.profileUrl else { return false }
+            return !url.isEmpty
+        }
+    }
+    
+    var displayBio: String? {
+        isCurrentUser ? viewModel.currentUser?.bio : fetchedUser?.bio
+    }
+    
+    var displayFollowers: Int {
+        isCurrentUser ? (viewModel.currentUser?.followers ?? 0) : (fetchedUser?.followers ?? 0)
+    }
+    
+    var displayFollowing: Int {
+        isCurrentUser ? (viewModel.currentUser?.followings ?? 0) : (fetchedUser?.following ?? 0)
+    }
+    
+    var displayThoughts: Int {
+        isCurrentUser ? (viewModel.currentUser?.thoughts ?? 0) : (fetchedUser?.thoughts ?? 0)
+    }
+    
+    var displayImageData: Data? {
+        isCurrentUser ? viewModel.profileImageData : fetchedProfileImageData
+    }
 
     var body: some View {
         
@@ -35,7 +80,7 @@ struct ProfileBasicView: View {
             // Uploading overlay
             
             
-            if viewModel.currentUser?.username == username {
+            if isCurrentUser {
                 HStack() {
                     
                     //if viewModel.currentUser?.username == username {
@@ -89,30 +134,40 @@ struct ProfileBasicView: View {
                         .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
                     
                     // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
-                    if let data = viewModel.profileImageData, let uiImage = UIImage(data: data) {
+                    if let data = displayImageData, let uiImage = UIImage(data: data) {
                         // Show the selected photo
                         Image(uiImage: uiImage)
                             .resizable()
                             .scaledToFill() // Ensures photo fills the square
                             .frame(width: 100, height: 100)
                             .clipShape(RoundedRectangle(cornerRadius: 12)) // Clips the overflowing image
+                    } else if hasProfileUrl {
+                        // STATE B: URL exists (Loading) -> Show Transparent
+                        // This prevents the "person.fill" from flashing while waiting for download
+                        Color.clear
+                        
                     } else {
-                        // Smaller image inside the rounded rectangle
+                        // STATE C: No URL exists at all -> Show Default Person Icon
                         Image(systemName: "person.fill")
                             .resizable()
                             .scaledToFit()
-                            .padding(10) // Add padding to make it smaller
+                            .padding(10)
                             .foregroundColor(.gray)
                     }
                 }
                 .frame(width: 100, height: 100)
                 .onTapGesture {
-                    if viewModel.profileImageData == nil {
-                        // Directly open picker if no profile image
-                        showPhotosPicker = true
+                    if isCurrentUser {
+                        if viewModel.profileImageData == nil {
+                            showPhotosPicker = true
+                        } else {
+                            isImageMenuOpen = true
+                        }
                     } else {
-                        // If image exists, open the menu
-                        isImageMenuOpen = true
+                        // For other users, maybe just open preview
+                        if displayImageData != nil {
+                            isPreviewOpen = true
+                        }
                     }
                 }
                 
@@ -125,7 +180,7 @@ struct ProfileBasicView: View {
                         dateDisabled: false
                     )) {
                         HStack {
-                            let followers = abs(viewModel.currentUser?.followers ?? 0)
+                            let followers = abs(displayFollowers)
                             Text("\(formatNumber(followers)) \(followers == 1 ? "follower" : "followers")")
                                 .font(.system(size: 17)).fixedSize()
                             
@@ -154,7 +209,7 @@ struct ProfileBasicView: View {
                         dateDisabled: false
                     )) {
                         HStack {
-                            Text("\(formatNumber(viewModel.currentUser?.followings ?? 0)) following")
+                            Text("\(formatNumber(displayFollowing)) following")
                                 .font(.system(size: 17)).fixedSize()
                             
                             Spacer()
@@ -182,7 +237,7 @@ struct ProfileBasicView: View {
             .padding(.top, 4)
             .padding(.bottom, 4)
             
-            if let bio = viewModel.currentUser?.bio, !bio.isEmpty {
+            if let bio = displayBio, !bio.isEmpty {
                 HStack {
                     Text(bio.toMarkdown())
                         .font(.system(size: 17)) // Adjust size to match styling
@@ -215,7 +270,13 @@ struct ProfileBasicView: View {
             //.border(Color.green, width: 2)
             Spacer()
         }
-        .padding(viewModel.currentUser?.username == username ? [.all] : [.horizontal, .bottom])
+        .padding(isCurrentUser ? [.all] : [.horizontal, .bottom])
+        .task {
+            // Only fetch if we are NOT the current user
+            if !isCurrentUser {
+                await loadUserProfile()
+            }
+        }
         .sheet(item: $webViewData) { data in
             FullScreenModalView(url: data.url)
                 .edgesIgnoringSafeArea(.all)
@@ -341,7 +402,7 @@ struct ProfileBasicView: View {
         .fullScreenCover(isPresented: $isPreviewOpen) {
             
             // Check if the image data exists before showing the preview
-            if let data = viewModel.profileImageData, let uiImage = UIImage(data: data) {
+            if let data = displayImageData, let uiImage = UIImage(data: data) {
                 
                 ZStack {
                     // 1. Full-screen background (like the white/black div in Next.js)
@@ -360,7 +421,7 @@ struct ProfileBasicView: View {
                             Button {
                                 isPreviewOpen = false
                                 // Optional: Re-open the Image Menu for 'Image Help' or 'Remove'
-                                isImageMenuOpen = true
+                                if isCurrentUser { isImageMenuOpen = true}
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .symbolRenderingMode(.hierarchical)
@@ -377,7 +438,7 @@ struct ProfileBasicView: View {
                 .onTapGesture {
                     isPreviewOpen = false
                     // Re-open the Image Menu
-                    isImageMenuOpen = true
+                    if isCurrentUser { isImageMenuOpen = true}
                 }
                 
             } else {
@@ -389,10 +450,10 @@ struct ProfileBasicView: View {
             }
         }
         //.border(.red, width: 2)
-        .navigationBarBackButtonHidden(viewModel.currentUser?.username != username)
+        .navigationBarBackButtonHidden(!isCurrentUser)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if viewModel.currentUser?.username != username {
+            if !isCurrentUser {
                 // The Back Button (Leading)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
@@ -420,6 +481,30 @@ struct ProfileBasicView: View {
                 }
             }
         }
+    }
+    
+    
+    func loadUserProfile() async {
+        isLoading = true
+        do {
+            // Fetch the profile struct (DB + Firestore)
+            let profile = try await fetchProfile(targetUsername: username, currentUsername: viewModel.currentUser?.username)
+            
+            await MainActor.run {
+                self.fetchedUser = profile
+            }
+            
+            // Fetch the Image if URL exists
+            if let urlString = profile.profileUrl, let url = URL(string: urlString) {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                await MainActor.run {
+                    self.fetchedProfileImageData = data
+                }
+            }
+        } catch {
+            print("❌ Failed to load user profile: \(error)")
+        }
+        await MainActor.run { isLoading = false }
     }
     
     func performImageUploadAndFinish() {
