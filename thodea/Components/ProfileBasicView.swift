@@ -39,6 +39,9 @@ struct ProfileBasicView: View {
     @State private var fetchedProfileImageData: Data?
     //@State private var isDeleting = false
 
+    // TEST [REMOVE]
+    @State private var isFollowingLocal: Bool = false
+
     private var hasProfileUrl: Bool {
         if isCurrentUser {
             // If it's me, check my local view model
@@ -73,410 +76,428 @@ struct ProfileBasicView: View {
     var displayImageData: Data? {
         isCurrentUser ? viewModel.profileImageData : fetchedProfileImageData
     }
-
+    
     var body: some View {
         
-        VStack(spacing: 4) {
-            // Uploading overlay
+        ZStack {
+            // 🔹 Screen background
+            Color(red: 17/255, green: 24/255, blue: 39/255)
+                .ignoresSafeArea()
             
-            
-            if isCurrentUser {
-                HStack() {
-                    
-                    //if viewModel.currentUser?.username == username {
-                    VStack {
-                        NavigationLink(destination: SettingsView()) {
-                            SettingsSVG()
-                                .font(.headline)
-                                .frame(maxWidth: 50, alignment: .leading)
-                        }
-                    }
-                    
-                    //.border(.green, width: 2) if username !== viewModel.currentUser.username
-                    Text(username)
-                        .font(.system(size: 18, weight: .bold))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    
-                    ZStack(alignment: .topTrailing) {
-                        // Envelope Image
+            VStack(spacing: 4) {
+                // Uploading overlay
+                
+                
+                if isCurrentUser {
+                    HStack() {
                         
-                        NavigationLink(destination: ChatsView()) {
-                            Image(systemName: "envelope")
-                                .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                                .font(.title2)
-                                .frame(maxWidth: 50, alignment: .trailing)
+                        //if viewModel.currentUser?.username == username {
+                        VStack {
+                            NavigationLink(destination: SettingsView()) {
+                                SettingsSVG()
+                                    .font(.headline)
+                                    .frame(maxWidth: 50, alignment: .leading)
+                            }
                         }
                         
+                        //.border(.green, width: 2) if username !== viewModel.currentUser.username
+                        Text(username)
+                            .font(.system(size: 18, weight: .bold))
+                            .frame(maxWidth: .infinity, alignment: .center)
                         
-                        // Orange Circle at top-right corner
-                        /*Circle()
-                         .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
-                         .frame(width: 10, height: 10)
-                         .offset(x: 2, y: -2) */
+                        ZStack(alignment: .topTrailing) {
+                            // Envelope Image
+                            
+                            NavigationLink(destination: ChatsView()) {
+                                Image(systemName: "envelope")
+                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                    .font(.title2)
+                                    .frame(maxWidth: 50, alignment: .trailing)
+                            }
+                            
+                            
+                            // Orange Circle at top-right corner
+                            /*Circle()
+                             .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
+                             .frame(width: 10, height: 10)
+                             .offset(x: 2, y: -2) */
+                        }
+                        .frame(width: 50, height: 24)// Adjust position if needed
                     }
-                    .frame(width: 50, height: 24)// Adjust position if needed
+                    .frame(maxWidth: .infinity, maxHeight: 30, alignment: .leading)
+                    //.border(.gray, width: 4)
+                    .padding(.bottom, 4)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 30, alignment: .leading)
-                //.border(.gray, width: 4)
-                .padding(.bottom, 4)
-            }
-            
-            HStack(spacing: 4) {
-                ZStack {
-                    // Rounded rectangle with border and shadow
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.clear)
-                        .frame(width: 100, height: 100)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray, lineWidth: 1) // Border
-                        )
-                        .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
-                    
-                    // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
-                    if let data = displayImageData, let uiImage = UIImage(data: data) {
-                        // Show the selected photo
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .scaledToFill() // Ensures photo fills the square
+                
+                HStack(spacing: 4) {
+                    ZStack {
+                        // Rounded rectangle with border and shadow
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(red: 17/255, green: 24/255, blue: 39/255))
                             .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: 12)) // Clips the overflowing image
-                    } else if hasProfileUrl {
-                        // STATE B: URL exists (Loading) -> Show Transparent
-                        // This prevents the "person.fill" from flashing while waiting for download
-                        Color.clear
+                            .shadow(color: Color.black.opacity(0.6), radius: 4, x: 0, y: 2)
                         
-                    } else {
-                        // STATE C: No URL exists at all -> Show Default Person Icon
-                        Image(systemName: "person.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .padding(10)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .frame(width: 100, height: 100)
-                .onTapGesture {
-                    if isCurrentUser {
-                        if viewModel.profileImageData == nil {
-                            showPhotosPicker = true
+                        // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
+                        if let data = displayImageData, let uiImage = UIImage(data: data) {
+                            // Show the selected photo
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .scaledToFill() // Ensures photo fills the square
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12)) // Clips the overflowing image
+                        } else if hasProfileUrl {
+                            // STATE B: URL exists (Loading) -> Show Transparent
+                            // This prevents the "person.fill" from flashing while waiting for download
+                            Color.clear
+                            
                         } else {
-                            isImageMenuOpen = true
-                        }
-                    } else {
-                        // For other users, maybe just open preview
-                        if displayImageData != nil {
-                            isPreviewOpen = true
-                        }
-                    }
-                }
-                
-                
-                VStack() {
-                    // 1. Followers Link
-                    NavigationLink(destination: FollowsView(
-                        username: viewModel.currentUser?.username ?? "",
-                        listType: "followers",
-                        dateDisabled: false
-                    )) {
-                        HStack {
-                            let followers = abs(displayFollowers)
-                            Text("\(formatNumber(followers)) \(followers == 1 ? "follower" : "followers")")
-                                .font(.system(size: 17)).fixedSize()
-                            
-                            Spacer()
-                            
-                            HStack(spacing: 0) {
-                                Rectangle()
-                                    .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
-                                    .frame(height: 3)
-                                    .padding(0)
-                                
-                                Rectangle()
-                                    .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
-                                    .frame(width: 8, height: 8, alignment: .trailing)
-                                    .padding(0)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // STATE C: No URL exists at all -> Show Default Person Icon
+                            Image(systemName: "person.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .padding(10)
+                                .foregroundColor(.gray)
                         }
                     }
-                    .buttonStyle(.plain) // Prevents blue text coloring
-                    
-                    // 2. Following Link
-                    NavigationLink(destination: FollowsView(
-                        username: viewModel.currentUser?.username ?? "",
-                        listType: "following",
-                        dateDisabled: false
-                    )) {
-                        HStack {
-                            Text("\(formatNumber(displayFollowing)) following")
-                                .font(.system(size: 17)).fixedSize()
-                            
-                            Spacer()
-                            
-                            HStack(spacing: 0) {
-                                Rectangle()
-                                    .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
-                                    .frame(height: 3)
-                                    .padding(0)
-                                
-                                Rectangle()
-                                    .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
-                                    .frame(width: 8, height: 8, alignment: .trailing)
-                                    .padding(0)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
-                    }
-                    .buttonStyle(.plain) // Prevents blue text coloring
-
-                }
-                .padding(.leading, 12)
-            }
-            .frame(maxWidth: .infinity, maxHeight: 100) // Set height for row
-            .padding(.top, 4)
-            .padding(.bottom, 4)
-            
-            if let bio = displayBio, !bio.isEmpty {
-                HStack {
-                    Text(bio.toMarkdown())
-                        .font(.system(size: 17)) // Adjust size to match styling
-                        .foregroundColor(Color(red: 156/255, green: 163/255, blue: 175/255)) // Matches text-gray-400
-                        .lineLimit(3) // Matches max-h-[50px] + truncate behavior
-                        .tint(.blue)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true) // Ensures text wraps properly
-                        .environment(\.openURL, OpenURLAction { url in
-                            // We trigger the sheet by setting this variable to a new struct
-                            webViewData = WebViewData(url: url)
-                            return .handled
-                        })
-                    Spacer() // Pushes text to the left
-                }
-                .padding(.top, 6) // Matches mt-4
-                //.border(Color.red, width: 2)
-            }
-            
-            VStack {
-                HStack {
-                    TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: viewModel.currentUser?.thoughts ?? 0)
-                    TabButton(title: "loved", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
-                    TabButton(title: "mentions", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
-                }
-                .padding(.top, bioInfo ? 2 : 4)  // Adjust the margin based on `bioInfo`
-                .frame(maxHeight: 50)
-            }
-            
-            //.border(Color.green, width: 2)
-            Spacer()
-        }
-        .padding(isCurrentUser ? [.all] : [.horizontal, .bottom])
-        .task {
-            // Only fetch if we are NOT the current user
-            if !isCurrentUser {
-                await loadUserProfile()
-            }
-        }
-        .sheet(item: $webViewData) { data in
-            FullScreenModalView(url: data.url)
-                .edgesIgnoringSafeArea(.all)
-        }
-        // 4. ATTACH THE PHOTO PICKER MODIFIER TO THE MAIN VIEW
-        .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPickerItem, matching: .images)
-        // 5. HANDLE DATA LOADING WHEN SELECTION CHANGES
-        .onChange(of: selectedPickerItem) { newItem in
-            Task {
-                guard let item = newItem else { return }
-                
-                await MainActor.run {
-                    //isImageMenuOpen = true
-                    authViewModel.isUploading = true
-                }
-                
-                do {
-                    // 🧹 If user already has an uploaded image → remove it first
-                    if viewModel.profileImageData != nil {
-                        try await viewModel.removeProfileImage(skipLocalCleanup: true)
-                    }
-                    
-                    // Load new image data
-                    guard let data = try? await item.loadTransferable(type: Data.self) else {
-                        await MainActor.run { authViewModel.isUploading = false }
-                        return
-                    }
-                    
-                    let ext = await item.fileExtension() ?? "jpg"
-                    await MainActor.run {
-                        viewModel.profileImageData = data
-                        viewModel.profileImageExtension = ext
-                    }
-                    
-                    print("Loaded: \(ext)")
-                    
-                    // 🚀 Continue to upload new image
-                    performImageUploadAndFinish()
-                    
-                } catch {
-                    print("Error replacing image: \(error)")
-                    await MainActor.run {
-                        authViewModel.isUploading = false
-                        isImageMenuOpen = false
-                    }
-                }
-            }
-        }
-        .fullScreenCover(isPresented: $isImageMenuOpen) {
-            ZStack {
-                
-                // 🔹 Background tap closes menu (same as onClick in React)
-                Color(red: 17/255, green: 24/255, blue: 39/255)
-                    .ignoresSafeArea()
+                    .frame(width: 100, height: 100)
                     .onTapGesture {
-                        if !authViewModel.isUploading {
+                        if isCurrentUser {
+                            if viewModel.profileImageData == nil {
+                                showPhotosPicker = true
+                            } else {
+                                isImageMenuOpen = true
+                            }
+                        } else {
+                            // For other users, maybe just open preview
+                            if displayImageData != nil {
+                                isPreviewOpen = true
+                            }
+                        }
+                    }
+                    
+                    
+                    VStack() {
+                        // 1. Followers Link
+                        NavigationLink(destination: FollowsView(
+                            username: viewModel.currentUser?.username ?? "",
+                            listType: "followers",
+                            dateDisabled: false
+                        )) {
+                            HStack {
+                                let followers = abs(displayFollowers)
+                                Text("\(formatNumber(followers)) \(followers == 1 ? "follower" : "followers")")
+                                    .font(.system(size: 17)).fixedSize()
+                                    .foregroundColor(.white.opacity(0.9))
+                                
+                                Spacer()
+                                
+                                HStack(spacing: 0) {
+                                    Rectangle()
+                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
+                                        .frame(height: 3)
+                                        .padding(0)
+                                    
+                                    Rectangle()
+                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
+                                        .frame(width: 8, height: 8, alignment: .trailing)
+                                        .padding(0)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        }
+                        .buttonStyle(.plain) // Prevents blue text coloring
+                        
+                        // 2. Following Link
+                        NavigationLink(destination: FollowsView(
+                            username: viewModel.currentUser?.username ?? "",
+                            listType: "following",
+                            dateDisabled: false
+                        )) {
+                            HStack {
+                                Text("\(formatNumber(displayFollowing)) following")
+                                    .font(.system(size: 17)).fixedSize()
+                                    .foregroundColor(.white.opacity(0.9))
+                                
+                                Spacer()
+                                
+                                HStack(spacing: 0) {
+                                    Rectangle()
+                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
+                                        .frame(height: 3)
+                                        .padding(0)
+                                    
+                                    Rectangle()
+                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
+                                        .frame(width: 8, height: 8, alignment: .trailing)
+                                        .padding(0)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
+                        }
+                        .buttonStyle(.plain) // Prevents blue text coloring
+                        
+                        if !isCurrentUser {
+                            FollowActionRow(isFollowing: isFollowingLocal) {
+                                var transaction = Transaction()
+                                transaction.animation = nil
+
+                                withTransaction(transaction) {
+                                    isFollowingLocal.toggle()
+                                }
+                            }
+                            .disabled(isLoading)
+                            .opacity(isLoading ? 0.5 : 1)
+                            .frame(maxHeight: .infinity, alignment: .center)
+                        }
+
+                    }
+                    .padding(.leading, 12)
+                }
+                .frame(maxWidth: .infinity, maxHeight: 100) // Set height for row
+                .padding(.top, 4)
+                .padding(.bottom, 4)
+                
+                if let bio = displayBio, !bio.isEmpty {
+                    HStack {
+                        Text(bio.toMarkdown())
+                            .font(.system(size: 17)) // Adjust size to match styling
+                            .foregroundColor(Color(red: 156/255, green: 163/255, blue: 175/255)) // Matches text-gray-400
+                            .lineLimit(3) // Matches max-h-[50px] + truncate behavior
+                            .tint(.blue)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true) // Ensures text wraps properly
+                            .environment(\.openURL, OpenURLAction { url in
+                                // We trigger the sheet by setting this variable to a new struct
+                                webViewData = WebViewData(url: url)
+                                return .handled
+                            })
+                        Spacer() // Pushes text to the left
+                    }
+                    .padding(.top, 6) // Matches mt-4
+                    //.border(Color.red, width: 2)
+                }
+                
+                VStack {
+                    HStack {
+                        TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: viewModel.currentUser?.thoughts ?? 0)
+                        TabButton(title: "loved", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
+                        TabButton(title: "mentions", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
+                    }
+                    .padding(.top, bioInfo ? 2 : 4)  // Adjust the margin based on `bioInfo`
+                    .frame(maxHeight: 50)
+                }
+                
+                //.border(Color.green, width: 2)
+                Spacer()
+            }
+            .padding(isCurrentUser ? [.all] : [.horizontal, .bottom])
+            .task {
+                // Only fetch if we are NOT the current user
+                if !isCurrentUser {
+                    await loadUserProfile()
+                }
+            }
+            .sheet(item: $webViewData) { data in
+                FullScreenModalView(url: data.url)
+                    .edgesIgnoringSafeArea(.all)
+            }
+            // 4. ATTACH THE PHOTO PICKER MODIFIER TO THE MAIN VIEW
+            .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPickerItem, matching: .images)
+            // 5. HANDLE DATA LOADING WHEN SELECTION CHANGES
+            .onChange(of: selectedPickerItem) { newItem in
+                Task {
+                    guard let item = newItem else { return }
+                    
+                    await MainActor.run {
+                        //isImageMenuOpen = true
+                        authViewModel.isUploading = true
+                    }
+                    
+                    do {
+                        // 🧹 If user already has an uploaded image → remove it first
+                        if viewModel.profileImageData != nil {
+                            try await viewModel.removeProfileImage(skipLocalCleanup: true)
+                        }
+                        
+                        // Load new image data
+                        guard let data = try? await item.loadTransferable(type: Data.self) else {
+                            await MainActor.run { authViewModel.isUploading = false }
+                            return
+                        }
+                        
+                        let ext = await item.fileExtension() ?? "jpg"
+                        await MainActor.run {
+                            viewModel.profileImageData = data
+                            viewModel.profileImageExtension = ext
+                        }
+                        
+                        print("Loaded: \(ext)")
+                        
+                        // 🚀 Continue to upload new image
+                        performImageUploadAndFinish()
+                        
+                    } catch {
+                        print("Error replacing image: \(error)")
+                        await MainActor.run {
+                            authViewModel.isUploading = false
                             isImageMenuOpen = false
                         }
                     }
-                
-                // TOP-aligned menu
-                VStack(alignment: .center, spacing: 0) {
-                    // Image Help
-                    modalButton(title: "Image Help")
+                }
+            }
+            .fullScreenCover(isPresented: $isImageMenuOpen) {
+                ZStack {
                     
-                    // Preview
-                    modalButton(title: "Preview") {
-                        isImageMenuOpen = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            isPreviewOpen = true
-                        }
-                    }
-                    .padding(.top, 24)
-                    
-                    // Remove
-                    modalButton(title: "Remove") {
-                        Task {
-                            do {
+                    // 🔹 Background tap closes menu (same as onClick in React)
+                    Color(red: 17/255, green: 24/255, blue: 39/255)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            if !authViewModel.isUploading {
                                 isImageMenuOpen = false
-                                await MainActor.run {authViewModel.isDeleting = true; authViewModel.isUploading = true }
-                                selectedPickerItem = nil
-                                try await authViewModel.removeProfileImage()
-                                
-                                await MainActor.run {
-                                    authViewModel.isDeleting = false
-                                    authViewModel.isUploading = false
-                                    isImageMenuOpen = false
-                                }
-                            } catch {
-                                await MainActor.run {
-                                    authViewModel.isDeleting = false
-                                    authViewModel.isUploading = false
-                                    isImageMenuOpen = false
-                                }
-                                print("Delete failed: \(error)")
                             }
                         }
-                    }
-                    .padding(.top, 24)
                     
-                    // Upload
-                    modalButton(title: "Upload") {
-                        // 1. Close the menu immediately
-                        isImageMenuOpen = false
+                    // TOP-aligned menu
+                    VStack(alignment: .center, spacing: 0) {
+                        // Image Help
+                        modalButton(title: "Image Help")
                         
-                        // 2. Add a tiny delay to allow the menu to dismiss cleanly
-                        // before the picker tries to present itself.
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            showPhotosPicker = true
+                        // Preview
+                        modalButton(title: "Preview") {
+                            isImageMenuOpen = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                isPreviewOpen = true
+                            }
                         }
+                        .padding(.top, 24)
+                        
+                        // Remove
+                        modalButton(title: "Remove") {
+                            Task {
+                                do {
+                                    isImageMenuOpen = false
+                                    await MainActor.run {authViewModel.isDeleting = true; authViewModel.isUploading = true }
+                                    selectedPickerItem = nil
+                                    try await authViewModel.removeProfileImage()
+                                    
+                                    await MainActor.run {
+                                        authViewModel.isDeleting = false
+                                        authViewModel.isUploading = false
+                                        isImageMenuOpen = false
+                                    }
+                                } catch {
+                                    await MainActor.run {
+                                        authViewModel.isDeleting = false
+                                        authViewModel.isUploading = false
+                                        isImageMenuOpen = false
+                                    }
+                                    print("Delete failed: \(error)")
+                                }
+                            }
+                        }
+                        .padding(.top, 24)
+                        
+                        // Upload
+                        modalButton(title: "Upload") {
+                            // 1. Close the menu immediately
+                            isImageMenuOpen = false
+                            
+                            // 2. Add a tiny delay to allow the menu to dismiss cleanly
+                            // before the picker tries to present itself.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                showPhotosPicker = true
+                            }
+                        }
+                        .padding(.top, 24)
+                        
+                        Spacer()   // pushes buttons to start at top
                     }
-                    .padding(.top, 24)
-                    
-                    Spacer()   // pushes buttons to start at top
+                    .padding(.top, 20)
+                    .padding(.horizontal, 30)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(Color.clear)
                 }
-                .padding(.top, 20)
-                .padding(.horizontal, 30)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(Color.clear)
             }
-            .background(Color.clear)
-        }
-        .fullScreenCover(isPresented: $isPreviewOpen) {
-            
-            // Check if the image data exists before showing the preview
-            if let data = displayImageData, let uiImage = UIImage(data: data) {
+            .fullScreenCover(isPresented: $isPreviewOpen) {
                 
-                ZStack {
-                    // 1. Full-screen background (like the white/black div in Next.js)
-                    Color.black.opacity(0.95)
-                        .ignoresSafeArea()
+                // Check if the image data exists before showing the preview
+                if let data = displayImageData, let uiImage = UIImage(data: data) {
                     
-                    // 2. The centered image
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button {
-                                isPreviewOpen = false
-                                // Optional: Re-open the Image Menu for 'Image Help' or 'Remove'
-                                if isCurrentUser { isImageMenuOpen = true}
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .symbolRenderingMode(.hierarchical)
-                                    .font(.largeTitle)
-                                    .foregroundColor(.blue)
-                                    .foregroundStyle(.gray)
-                                    .padding(2)
+                    ZStack {
+                        // 1. Full-screen background (like the white/black div in Next.js)
+                        Color.black.opacity(0.95)
+                            .ignoresSafeArea()
+                        
+                        // 2. The centered image
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        
+                        VStack {
+                            HStack {
+                                Spacer()
+                                Button {
+                                    isPreviewOpen = false
+                                    // Optional: Re-open the Image Menu for 'Image Help' or 'Remove'
+                                    if isCurrentUser { isImageMenuOpen = true}
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .symbolRenderingMode(.hierarchical)
+                                        .font(.largeTitle)
+                                        .foregroundColor(.blue)
+                                        .foregroundStyle(.gray)
+                                        .padding(2)
+                                }
                             }
+                            Spacer()
                         }
-                        Spacer()
                     }
-                }
-                // 4. Tap gesture on the whole view to close it and reopen the menu
-                .onTapGesture {
-                    isPreviewOpen = false
-                    // Re-open the Image Menu
-                    if isCurrentUser { isImageMenuOpen = true}
-                }
-                
-            } else {
-                // Fallback if image data is somehow missing
-                Text("No image to preview")
-                    .onAppear {
-                        isPreviewOpen = false // Close the preview if no image exists
+                    // 4. Tap gesture on the whole view to close it and reopen the menu
+                    .onTapGesture {
+                        isPreviewOpen = false
+                        // Re-open the Image Menu
+                        if isCurrentUser { isImageMenuOpen = true}
                     }
+                    
+                } else {
+                    // Fallback if image data is somehow missing
+                    Text("No image to preview")
+                        .onAppear {
+                            isPreviewOpen = false // Close the preview if no image exists
+                        }
+                }
             }
-        }
-        //.border(.red, width: 2)
-        .navigationBarBackButtonHidden(!isCurrentUser)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if !isCurrentUser {
-                // The Back Button (Leading)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        presentationMode.wrappedValue.dismiss()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.blue.opacity(0.8))
+            //.border(.red, width: 2)
+            .navigationBarBackButtonHidden(!isCurrentUser)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if !isCurrentUser {
+                    // The Back Button (Leading)
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.blue.opacity(0.8))
+                        }
                     }
-                }
-        
-                ToolbarItem(placement: .principal) {
-                    Text(username)
-                        .font(.system(size: 18, weight: .bold))
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ChatsView()) {
-                        Image(systemName: "paperplane.fill")
-                            .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                            .font(.title2)
-                            .scaleEffect(0.8) 
-                            .frame(maxWidth: 50, alignment: .trailing)
+                    
+                    ToolbarItem(placement: .principal) {
+                        Text(username)
+                            .font(.system(size: 18, weight: .bold))
+                    }
+                    
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        NavigationLink(destination: ChatsView()) {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                .font(.title2)
+                                .scaleEffect(0.8)
+                                .frame(maxWidth: 50, alignment: .trailing)
+                        }
                     }
                 }
             }
@@ -555,4 +576,63 @@ struct ProfileBasicView: View {
 #Preview {
     ProfileBasicView(username: "delete")
         .environmentObject(AuthViewModel())
+}
+
+struct RemoveIcon: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255), lineWidth: 2)
+                .frame(width: 20, height: 20)
+
+            Rectangle()
+                .fill(Color(red: 192/255, green: 192/255, blue: 192/255))
+                .frame(width: 10, height: 2)
+                .cornerRadius(5)
+        }
+    }
+}
+
+struct AddIcon: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .strokeBorder(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255), lineWidth: 2)
+                .frame(width: 20, height: 20)
+
+            Rectangle()
+                .fill(Color(red: 192/255, green: 192/255, blue: 192/255))
+                .frame(width: 10, height: 2)
+                .cornerRadius(5)
+
+            Rectangle()
+                .fill(Color(red: 192/255, green: 192/255, blue: 192/255))
+                .frame(width: 2, height: 10)
+                .cornerRadius(5)
+        }
+    }
+}
+
+struct FollowActionRow: View {
+    let isFollowing: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Spacer()   // ⬅️ pushes content to the right
+                Text(isFollowing ? "Unfollow" : "Follow")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                if isFollowing {
+                    RemoveIcon()
+                } else {
+                    AddIcon()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 }

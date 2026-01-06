@@ -315,16 +315,17 @@ struct UserRowView: View {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
-                            Color.gray.opacity(0.2)
+                            Color(red: 17/255, green: 24/255, blue: 39/255)
                         }
                     } else {
                         ZStack {
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(Color.gray.opacity(0.4), lineWidth: 1)
-                            VStack(spacing: 4) {
-                                Capsule().fill(Color.gray.opacity(0.5)).frame(width: 8, height: 8)
-                                Capsule().fill(Color.gray.opacity(0.5)).frame(width: 12, height: 8)
-                            }
+                            Image(systemName: "person.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .padding(10)
+                                .foregroundColor(.gray)
                         }
                     }
                 }
