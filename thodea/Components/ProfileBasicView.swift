@@ -41,7 +41,9 @@ struct ProfileBasicView: View {
 
     // TEST [REMOVE]
     @State private var isFollowingLocal: Bool = false
-
+    private let followService = Follow()
+    @State private var showLimitAlert = false // 🔔 For the 250 limit
+    
     private var hasProfileUrl: Bool {
         if isCurrentUser {
             // If it's me, check my local view model
@@ -237,12 +239,16 @@ struct ProfileBasicView: View {
                         .buttonStyle(.plain) // Prevents blue text coloring
                         
                         if !isCurrentUser {
-                            FollowActionRow(isFollowing: isFollowingLocal) {
+                            
+                            let amIFollowing = fetchedUser?.isFollowing ?? false
+                                                        
+                            FollowActionRow(isFollowing: amIFollowing) {
                                 var transaction = Transaction()
                                 transaction.animation = nil
 
                                 withTransaction(transaction) {
-                                    isFollowingLocal.toggle()
+                                    handleFollowToggle()
+                                    //isFollowingLocal.toggle()
                                 }
                             }
                             .disabled(isLoading)
@@ -291,6 +297,12 @@ struct ProfileBasicView: View {
                 Spacer()
             }
             .padding(isCurrentUser ? [.all] : [.horizontal, .bottom])
+            // --- ALERTS & SHEETS ---
+            .alert("Max 250 following", isPresented: $showLimitAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You cannot follow more than 250 users.")
+            }
             .task {
                 // Only fetch if we are NOT the current user
                 if !isCurrentUser {
@@ -569,6 +581,71 @@ struct ProfileBasicView: View {
             }
         }
     }
+    
+    func handleFollowToggle() {
+            guard let myUsername = viewModel.currentUser?.username,
+                  var targetUser = fetchedUser else { return }
+            
+            let isCurrentlyFollowing = targetUser.isFollowing
+            let myCurrentCount = viewModel.currentUser?.followings ?? 0
+            
+            // 1. LIMIT CHECK
+            // Only check if we are attempting to Follow (currently NOT following)
+            if !isCurrentlyFollowing {
+                if myCurrentCount >= 250 {
+                    print("🚫 Max 250 following limit reached")
+                    showLimitAlert = true
+                    return
+                }
+            }
+            
+            // 2. OPTIMISTIC UPDATE (Update UI immediately)
+            // Flip the boolean
+            fetchedUser?.isFollowing.toggle()
+            
+            // Update the counts visually
+            if isCurrentlyFollowing {
+                // We are unfollowing: Decrease
+                fetchedUser?.followers -= 1
+                viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
+            } else {
+                // We are following: Increase
+                fetchedUser?.followers += 1
+                viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
+            }
+            
+            // 3. SERVICE CALL
+            Task {
+                do {
+                    try await followService.followUser(
+                        userToFollow: targetUser.username,
+                        userFollowing: myUsername,
+                        isFollowing: isCurrentlyFollowing // Pass the OLD state
+                    )
+                    print("✅ Successfully \(isCurrentlyFollowing ? "unfollowed" : "followed") \(targetUser.username)")
+                    
+                    // Optional: Force a background refresh to ensure consistency
+                    // await loadUserProfile()
+                    
+                } catch {
+                    print("❌ Follow action failed: \(error)")
+                    
+                    // 4. REVERT UI ON FAILURE
+                    await MainActor.run {
+                        fetchedUser?.isFollowing = isCurrentlyFollowing // Reset to old state
+                        
+                        // Revert counts
+                        if isCurrentlyFollowing {
+                            fetchedUser?.followers += 1
+                            viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
+                        } else {
+                            fetchedUser?.followers -= 1
+                            viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
+                        }
+                    }
+                }
+            }
+        }
    
 }
 
@@ -636,3 +713,67 @@ struct FollowActionRow: View {
         .buttonStyle(.plain)
     }
 }
+
+
+
+
+struct Follow {
+    private let fdb = Firestore.firestore()
+    private let rdb = Database.database().reference()
+    
+    // Equivalent to your NextJS `followUser`
+    func followUser(userToFollow: String, userFollowing: String, isFollowing: Bool) async throws {
+        if !isFollowing {
+            // MARK: - Follow Logic
+            
+            // 1. Update Realtime DB Counters (Atomic Increment)
+            let updates: [AnyHashable: Any] = [
+                "user/\(userToFollow)/followers": ServerValue.increment(-1),
+                "user/\(userFollowing)/following": ServerValue.increment(-1)
+            ]
+            try await rdb.updateChildValues(updates)
+            
+            // 2. Set New Follower (Firestore Subcollection)
+            let followerData: [String: Any] = [
+                "username": userFollowing,
+                "followedAt": FieldValue.serverTimestamp()
+            ]
+            try await fdb.collection("user").document(userToFollow).collection("followers").document(userFollowing).setData(followerData)
+            
+            // 3. Set New Following (Firestore Subcollection)
+            let followingData: [String: Any] = [
+                "username": userToFollow,
+                "followedAt": FieldValue.serverTimestamp()
+            ]
+            try await fdb.collection("user").document(userFollowing).collection("following").document(userToFollow).setData(followingData)
+            
+            // 4. Update Following Array (Firestore Array Union)
+            try await fdb.collection("user").document(userFollowing).updateData([
+                "following": FieldValue.arrayUnion([userToFollow])
+            ])
+            
+        } else {
+            // MARK: - Unfollow Logic
+            
+            // 1. Update Realtime DB Counters
+            let updates: [AnyHashable: Any] = [
+                "user/\(userToFollow)/followers": ServerValue.increment(1),
+                "user/\(userFollowing)/following": ServerValue.increment(1)
+            ]
+            try await rdb.updateChildValues(updates)
+            
+            // 2. Delete Documents
+            try await fdb.collection("user").document(userToFollow).collection("followers").document(userFollowing).delete()
+            try await fdb.collection("user").document(userFollowing).collection("following").document(userToFollow).delete()
+            
+            // 3. Remove from Following Array
+            try await fdb.collection("user").document(userFollowing).updateData([
+                "following": FieldValue.arrayRemove([userToFollow])
+            ])
+
+        }
+    }
+    
+}
+
+
