@@ -13,6 +13,7 @@ import FirebaseFirestore
 
 struct ProfileBasicView: View {
     let username: String
+    let isNavigated: Bool
     @State private var userName: String = "John Doe" // Sample username
     @State private var userImage: String = "profile_picture"
     @State private var selectedTab: String = "thoughts"
@@ -90,7 +91,7 @@ struct ProfileBasicView: View {
                 // Uploading overlay
                 
                 
-                if isCurrentUser {
+                if isCurrentUser && !isNavigated {
                     HStack() {
                         
                         //if viewModel.currentUser?.username == username {
@@ -296,7 +297,7 @@ struct ProfileBasicView: View {
                 //.border(Color.green, width: 2)
                 Spacer()
             }
-            .padding(isCurrentUser ? [.all] : [.horizontal, .bottom])
+            .padding(isCurrentUser && !isNavigated ? [.all] : [.horizontal, .bottom])
             // --- ALERTS & SHEETS ---
             .alert("Max 250 following", isPresented: $showLimitAlert) {
                 Button("OK", role: .cancel) { }
@@ -482,10 +483,10 @@ struct ProfileBasicView: View {
                 }
             }
             //.border(.red, width: 2)
-            .navigationBarBackButtonHidden(!isCurrentUser)
+            .navigationBarBackButtonHidden(true)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !isCurrentUser {
+                if isNavigated {
                     // The Back Button (Leading)
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button(action: {
@@ -501,14 +502,16 @@ struct ProfileBasicView: View {
                         Text(username)
                             .font(.system(size: 18, weight: .bold))
                     }
-                    
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        NavigationLink(destination: ChatsView()) {
-                            Image(systemName: "paperplane.fill")
-                                .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                                .font(.title2)
-                                .scaleEffect(0.8)
-                                .frame(maxWidth: 50, alignment: .trailing)
+                        
+                    if !isCurrentUser {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            NavigationLink(destination: ChatsView()) {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                    .font(.title2)
+                                    .scaleEffect(0.8)
+                                    .frame(maxWidth: 50, alignment: .trailing)
+                            }
                         }
                     }
                 }
@@ -584,7 +587,7 @@ struct ProfileBasicView: View {
     
     func handleFollowToggle() {
             guard let myUsername = viewModel.currentUser?.username,
-                  var targetUser = fetchedUser else { return }
+                  let targetUser = fetchedUser else { return }
             
             let isCurrentlyFollowing = targetUser.isFollowing
             let myCurrentCount = viewModel.currentUser?.followings ?? 0
@@ -651,7 +654,7 @@ struct ProfileBasicView: View {
 
 
 #Preview {
-    ProfileBasicView(username: "delete")
+    ProfileBasicView(username: "delete", isNavigated: false)
         .environmentObject(AuthViewModel())
 }
 
