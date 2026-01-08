@@ -19,7 +19,7 @@ struct ProfileUserView: View {
         ZStack(alignment: .top) {
             Color(red: 17/255, green: 24/255, blue: 39/255)
             .ignoresSafeArea()
-            ProfileBasicView(username: username)
+            ProfileBasicView(username: username, isNavigated: true)
         }
     }
 }

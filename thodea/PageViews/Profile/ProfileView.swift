@@ -15,7 +15,7 @@ struct ProfileView: View {
         ZStack(alignment: .top) {
             Color(red: 17/255, green: 24/255, blue: 39/255)
             .ignoresSafeArea()
-            ProfileBasicView(username: authViewModel.currentUser?.username ?? "")
+            ProfileBasicView(username: authViewModel.currentUser?.username ?? "", isNavigated: false)
         }.disabled(authViewModel.isUploading)
     }
 }
