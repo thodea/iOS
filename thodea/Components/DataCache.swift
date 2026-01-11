@@ -27,4 +27,19 @@ class FollowCache: ObservableObject {
     func save(username: String, type: String, users: [ProfileUserInfo], lastDoc: DocumentSnapshot?) {
         storage["\(username)_\(type)"] = CachedFollowData(users: users, lastDocument: lastDoc)
     }
+    
+    func updateFollowerCount(targetUsername: String, delta: Int) {
+        // Iterate over all cached lists to find this user and update them everywhere
+        for (key, data) in storage {
+            if let index = data.users.firstIndex(where: { $0.username == targetUsername }) {
+                var updatedUsers = data.users
+                var user = updatedUsers[index]
+                user.followers = (user.followers ?? 0) + delta
+                updatedUsers[index] = user
+                
+                // Save back to storage
+                storage[key] = CachedFollowData(users: updatedUsers, lastDocument: data.lastDocument)
+            }
+        }
+    }
 }
