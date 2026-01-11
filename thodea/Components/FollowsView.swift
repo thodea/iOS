@@ -25,6 +25,46 @@ class FollowListViewModel: ObservableObject {
     private let pageSize = 4 // As requested
     private let maxHardLimit = 50 // 🎯 The Hard Limit
     
+    // 1️⃣ Add Init to subscribe to the notification
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: .userFollowInfoUpdated,
+            object: nil,
+            queue: nil // queue does NOT matter for actor isolation
+        ) { [weak self] notification in
+            Task { @MainActor in
+                self?.handleUserUpdate(notification)
+            }
+        }
+    }
+    
+    // 2️⃣ Handle the update efficiently
+    private func handleUserUpdate(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let targetUsername = userInfo["username"] as? String,
+              let change = userInfo["change"] as? Int else { return }
+
+        // Find the index of the user in our current list
+        if let index = users.firstIndex(where: { $0.username == targetUsername }) {
+            
+            // Update the local list (Triggering UI update)
+            var updatedUser = users[index]
+            // Safely unwrap and add/subtract the change
+            let currentCount = updatedUser.followers ?? 0
+            updatedUser.followers = max(0, currentCount + change)
+            
+            self.users[index] = updatedUser
+            cache.updateFollowerCount(targetUsername: targetUsername, delta: change)
+            print("✅ ViewModel updated follower count for \(targetUsername)")
+            
+            // 3️⃣ Update the Cache too (So if we leave and come back, it's still correct)
+            // Note: You need to know which 'key' (username + listType) this current list belongs to.
+            // Since we don't store the current username/listType in the class properties in your code,
+            // strictly speaking, we are just updating the RAM cache here for consistency.
+            // If you want to be perfect, store `currentUsername` and `currentListType` in the VM class.
+        }
+    }
+
     func loadInitial(username: String, listType: String) async {
         // 🔒 Prevent reloading if we already have data
         guard !didLoadOnce else { return }
@@ -117,6 +157,10 @@ class FollowListViewModel: ObservableObject {
         }
         
         isLoadingMore = false
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
 

@@ -232,3 +232,9 @@ extension PhotosPickerItem {
     }
 }
 
+
+extension Notification.Name {
+    // 🔔 A unique name for when a follower count changes
+    static let userFollowInfoUpdated = Notification.Name("userFollowInfoUpdated")
+    //[TO DO] - Extend to all user profiles rendered in Search and Feed too
+}

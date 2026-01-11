@@ -100,6 +100,7 @@ struct ProfileBasicView: View {
                                 SettingsSVG()
                                     .font(.headline)
                                     .frame(maxWidth: 50, alignment: .leading)
+                                    .compositingGroup()
                             }
                         }
                         
@@ -165,11 +166,18 @@ struct ProfileBasicView: View {
                     .frame(width: 100, height: 100)
                     .onTapGesture {
                         if isCurrentUser {
-                            if viewModel.profileImageData == nil {
-                                showPhotosPicker = true
+                            if !isNavigated {
+                                if viewModel.profileImageData == nil {
+                                    showPhotosPicker = true
+                                } else {
+                                    isImageMenuOpen = true
+                                }
                             } else {
-                                isImageMenuOpen = true
+                                if viewModel.profileImageData != nil {
+                                    isPreviewOpen = true
+                                }
                             }
+                            
                         } else {
                             // For other users, maybe just open preview
                             if displayImageData != nil {
@@ -595,7 +603,7 @@ struct ProfileBasicView: View {
             // 1. LIMIT CHECK
             // Only check if we are attempting to Follow (currently NOT following)
             if !isCurrentlyFollowing {
-                if myCurrentCount >= 250 {
+                if abs(myCurrentCount) >= 250 {
                     print("🚫 Max 250 following limit reached")
                     showLimitAlert = true
                     return
@@ -603,6 +611,7 @@ struct ProfileBasicView: View {
             }
             
             // 2. OPTIMISTIC UPDATE (Update UI immediately)
+            let delta = isCurrentlyFollowing ? -1 : 1
             // Flip the boolean
             fetchedUser?.isFollowing.toggle()
             
@@ -617,6 +626,15 @@ struct ProfileBasicView: View {
                 viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
             }
             
+            NotificationCenter.default.post(
+                name: .userFollowInfoUpdated,
+                object: nil,
+                userInfo: [
+                    "username": targetUser.username,
+                    "change": delta
+                ]
+            )
+        
             // 3. SERVICE CALL
             Task {
                 do {
@@ -645,6 +663,17 @@ struct ProfileBasicView: View {
                             fetchedUser?.followers -= 1
                             viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
                         }
+                        
+                        // 🔥 REVERT THE BROADCAST
+                        // We send the OPPOSITE change (-delta) to undo the list update
+                        NotificationCenter.default.post(
+                            name: .userFollowInfoUpdated,
+                            object: nil,
+                            userInfo: [
+                                "username": targetUser.username,
+                                "change": -delta
+                            ]
+                        )
                     }
                 }
             }
