@@ -43,3 +43,41 @@ class FollowCache: ObservableObject {
         }
     }
 }
+
+@MainActor
+class ProfileCache: ObservableObject {
+    static let shared = ProfileCache()
+    
+    // This struct holds both the data and the potentially downloaded image
+    struct CachedProfileData {
+        var info: ProfileInfo
+        var imageData: Data?
+    }
+    
+    // Key = Username
+    @Published var storage: [String: CachedProfileData] = [:]
+    
+    func get(username: String) -> CachedProfileData? {
+        return storage[username]
+    }
+    
+    func save(username: String, info: ProfileInfo, imageData: Data?) {
+        storage[username] = CachedProfileData(info: info, imageData: imageData)
+    }
+    
+    // Update follower count in cache without re-fetching
+    func updateFollowerCount(username: String, delta: Int) {
+        guard var data = storage[username] else { return }
+        
+        var updatedInfo = data.info
+        let currentFollowers = updatedInfo.followers
+        updatedInfo.followers = max(0, currentFollowers + delta)
+        
+        // If we are following them now (delta +1), set isFollowing to true, etc.
+        if delta > 0 { updatedInfo.isFollowing = true }
+        if delta < 0 { updatedInfo.isFollowing = false }
+        
+        data.info = updatedInfo
+        storage[username] = data
+    }
+}

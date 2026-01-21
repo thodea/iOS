@@ -315,7 +315,8 @@ struct ProfileBasicView: View {
             .task {
                 // Only fetch if we are NOT the current user
                 if !isCurrentUser {
-                    await loadUserProfile()
+                    await loadInitial()
+                    //await loadUserProfile()
                 }
             }
             .sheet(item: $webViewData) { data in
@@ -527,6 +528,23 @@ struct ProfileBasicView: View {
         }
     }
     
+    /// Checks cache first; if missing, fetches from network.
+    func loadInitial() async {
+        // 1. Check if data exists in Cache
+        if let cachedData = ProfileCache.shared.get(username: username) {
+            //print("🟢 [ProfileBasicView] Cache HIT for \(username)")
+            
+            // Immediately populate UI with cached data
+            self.fetchedUser = cachedData.info
+            self.fetchedProfileImageData = cachedData.imageData
+            self.isLoading = false
+            return
+        }
+        
+        // 2. If no cache, fetch from network
+        //print("🟡 [ProfileBasicView] Cache MISS for \(username). Fetching...")
+        await loadUserProfile()
+    }
     
     func loadUserProfile() async {
         isLoading = true
@@ -534,21 +552,28 @@ struct ProfileBasicView: View {
             // Fetch the profile struct (DB + Firestore)
             let profile = try await fetchProfile(targetUsername: username, currentUsername: viewModel.currentUser?.username)
             
-            await MainActor.run {
-                self.fetchedUser = profile
-            }
+            var profileImage: Data? = nil
             
             // Fetch the Image if URL exists
             if let urlString = profile.profileUrl, let url = URL(string: urlString) {
                 let (data, _) = try await URLSession.shared.data(from: url)
-                await MainActor.run {
-                    self.fetchedProfileImageData = data
-                }
+                profileImage = data
+            }
+            
+            // 3. Update State on Main Thread
+            await MainActor.run {
+                self.fetchedUser = profile
+                self.fetchedProfileImageData = profileImage
+                self.isLoading = false
+                
+                // 4. Save to Cache immediately after fetching
+                ProfileCache.shared.save(username: username, info: profile, imageData: profileImage)
+                //print("💾 [ProfileBasicView] Saved \(username) to Cache")
             }
         } catch {
             print("❌ Failed to load user profile: \(error)")
+            await MainActor.run { isLoading = false }
         }
-        await MainActor.run { isLoading = false }
     }
     
     func performImageUploadAndFinish() {
@@ -594,91 +619,93 @@ struct ProfileBasicView: View {
     }
     
     func handleFollowToggle() {
-            guard let myUsername = viewModel.currentUser?.username,
-                  let targetUser = fetchedUser else { return }
-            
-            let isCurrentlyFollowing = targetUser.isFollowing
-            let myCurrentCount = viewModel.currentUser?.followings ?? 0
-            
-            // 1. LIMIT CHECK
-            // Only check if we are attempting to Follow (currently NOT following)
-            if !isCurrentlyFollowing {
-                if abs(myCurrentCount) >= 250 {
-                    print("🚫 Max 250 following limit reached")
-                    showLimitAlert = true
-                    return
-                }
-            }
-            
-            // 2. OPTIMISTIC UPDATE (Update UI immediately)
-            let delta = isCurrentlyFollowing ? -1 : 1
-            // Flip the boolean
-            fetchedUser?.isFollowing.toggle()
-            
-            // Update the counts visually
-            if isCurrentlyFollowing {
-                // We are unfollowing: Decrease
-                fetchedUser?.followers -= 1
-                viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
-            } else {
-                // We are following: Increase
-                fetchedUser?.followers += 1
-                viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
-            }
-            
-            NotificationCenter.default.post(
-                name: .userFollowInfoUpdated,
-                object: nil,
-                userInfo: [
-                    "username": targetUser.username,
-                    "change": delta
-                ]
-            )
+        guard let myUsername = viewModel.currentUser?.username,
+              let targetUser = fetchedUser else { return }
         
-            // 3. SERVICE CALL
-            Task {
-                do {
-                    try await followService.followUser(
-                        userToFollow: targetUser.username,
-                        userFollowing: myUsername,
-                        isFollowing: isCurrentlyFollowing // Pass the OLD state
-                    )
-                    print("✅ Successfully \(isCurrentlyFollowing ? "unfollowed" : "followed") \(targetUser.username)")
+        let isCurrentlyFollowing = targetUser.isFollowing
+        let myCurrentCount = viewModel.currentUser?.followings ?? 0
+        
+        // 1. LIMIT CHECK
+        // Only check if we are attempting to Follow (currently NOT following)
+        if !isCurrentlyFollowing {
+            if abs(myCurrentCount) >= 250 {
+                print("🚫 Max 250 following limit reached")
+                showLimitAlert = true
+                return
+            }
+        }
+        
+        // 2. OPTIMISTIC UPDATE (Update UI immediately)
+        let delta = isCurrentlyFollowing ? -1 : 1
+        // Flip the boolean
+        fetchedUser?.isFollowing.toggle()
+        
+        // Update the counts visually
+        if isCurrentlyFollowing {
+            // We are unfollowing: Decrease
+            fetchedUser?.followers -= 1
+            viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
+        } else {
+            // We are following: Increase
+            fetchedUser?.followers += 1
+            viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
+        }
+        
+        ProfileCache.shared.updateFollowerCount(username: targetUser.username, delta: delta)
+        
+        NotificationCenter.default.post(
+            name: .userFollowInfoUpdated,
+            object: nil,
+            userInfo: [
+                "username": targetUser.username,
+                "change": delta
+            ]
+        )
+    
+        // 3. SERVICE CALL
+        Task {
+            do {
+                try await followService.followUser(
+                    userToFollow: targetUser.username,
+                    userFollowing: myUsername,
+                    isFollowing: isCurrentlyFollowing // Pass the OLD state
+                )
+                print("✅ Successfully \(isCurrentlyFollowing ? "unfollowed" : "followed") \(targetUser.username)")
+                
+                // Optional: Force a background refresh to ensure consistency
+                // await loadUserProfile()
+                
+            } catch {
+                print("❌ Follow action failed: \(error)")
+                
+                // 4. REVERT UI ON FAILURE
+                await MainActor.run {
+                    fetchedUser?.isFollowing = isCurrentlyFollowing // Reset to old state
                     
-                    // Optional: Force a background refresh to ensure consistency
-                    // await loadUserProfile()
-                    
-                } catch {
-                    print("❌ Follow action failed: \(error)")
-                    
-                    // 4. REVERT UI ON FAILURE
-                    await MainActor.run {
-                        fetchedUser?.isFollowing = isCurrentlyFollowing // Reset to old state
-                        
-                        // Revert counts
-                        if isCurrentlyFollowing {
-                            fetchedUser?.followers += 1
-                            viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
-                        } else {
-                            fetchedUser?.followers -= 1
-                            viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
-                        }
-                        
-                        // 🔥 REVERT THE BROADCAST
-                        // We send the OPPOSITE change (-delta) to undo the list update
-                        NotificationCenter.default.post(
-                            name: .userFollowInfoUpdated,
-                            object: nil,
-                            userInfo: [
-                                "username": targetUser.username,
-                                "change": -delta
-                            ]
-                        )
+                    // Revert counts
+                    if isCurrentlyFollowing {
+                        fetchedUser?.followers += 1
+                        viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) + 1
+                    } else {
+                        fetchedUser?.followers -= 1
+                        viewModel.currentUser?.followings = (viewModel.currentUser?.followings ?? 0) - 1
                     }
+                    
+                    // 🔥 REVERT THE BROADCAST
+                    ProfileCache.shared.updateFollowerCount(username: targetUser.username, delta: -delta)
+                    // We send the OPPOSITE change (-delta) to undo the list update
+                    NotificationCenter.default.post(
+                        name: .userFollowInfoUpdated,
+                        object: nil,
+                        userInfo: [
+                            "username": targetUser.username,
+                            "change": -delta
+                        ]
+                    )
                 }
             }
         }
-   
+    }
 }
 
 

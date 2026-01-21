@@ -23,7 +23,7 @@ class FollowListViewModel: ObservableObject {
     private let service = FollowService()
     private let cache = FollowCache.shared
     private let pageSize = 4 // As requested
-    private let maxHardLimit = 50 // 🎯 The Hard Limit
+    private let maxHardLimit = 250 // 🎯 The Hard Limit
     
     // 1️⃣ Add Init to subscribe to the notification
     init() {
