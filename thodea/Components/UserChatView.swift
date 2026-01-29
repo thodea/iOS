@@ -49,6 +49,19 @@ struct UserChatView: View {
 
     private var messageInputBar: some View {
         HStack(alignment: .bottom, spacing: 0) {
+            Button(action: {
+                print("Image button clicked")
+            }) {
+                Image(systemName: "photo.artframe")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 26, height: 26)
+                    .padding(3)
+                    .foregroundColor(.blue) // Replicates fill-blue-400
+            }
+            .padding(.trailing, 4)
+            .buttonStyle(.plain)
+            
             TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.white.opacity(0.7)))
                 .textFieldStyle(DefaultTextFieldStyle())
                 .frame(minHeight: 40)
@@ -68,7 +81,7 @@ struct UserChatView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 28, height: 28)
-                    .foregroundColor(.white)
+                    .foregroundColor(.gray)
                     .padding(10)
                     .background(Color.clear)
                     .clipShape(Circle())

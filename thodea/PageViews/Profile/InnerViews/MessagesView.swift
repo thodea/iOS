@@ -21,20 +21,33 @@ struct MessagesView: View {
         //.edgesIgnoringSafeArea(.bottom)
         .padding(0)
         .frame(maxWidth: .infinity, maxHeight: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
-        .foregroundColor(.white.opacity(0.9))
-        .navigationBarBackButtonHidden(true) // Hides the default back button
-            .navigationBarItems(leading: Button(action: {
-                self.presentationMode.wrappedValue.dismiss() // Custom back button action
-            }) {
-                Image(systemName: "chevron.left") // Custom back button icon
-                    .foregroundColor(.blue.opacity(0.8)) // Color of the icon
-            })
+        //.border(.red, width: 2)
+        .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar{
-            ToolbarItem(placement: .principal) {
-                Text("Messages")
-                    .font(.system(size: 22))
-                    .foregroundColor(.white.opacity(0.9))
+        .toolbarBackground(Color(red: 17/255, green: 24/255, blue: 39/255), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            // The Back Button (Leading)
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    presentationMode.wrappedValue.dismiss()
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.blue.opacity(0.8))
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    // Your action here
+                }) {
+                    Image(systemName: "ellipsis") // Or "ellipsis.circle"
+                        .rotationEffect(.degrees(90)) // Makes it vertical to match your SVG
+                        .font(.title2)
+                        .padding(.trailing, -8) // This "cheats" the system padding
+                        .foregroundColor(Color(uiColor: .systemGray)) // Matches fill-gray-400
+                }
             }
         }
     }
@@ -43,6 +56,8 @@ struct MessagesView: View {
 
 struct MessagesView_Previews: PreviewProvider {
     static var previews: some View {
-        MessagesView()
+        NavigationStack { // <--- Wrap it here
+            MessagesView()
+        }
     }
 }
