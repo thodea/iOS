@@ -38,6 +38,8 @@ struct ProfileBasicView: View {
     }
     @State private var fetchedUser: ProfileInfo?
     @State private var fetchedProfileImageData: Data?
+    @State private var fetchedProfileMiniImageData: Data?
+
     //@State private var isDeleting = false
 
     // TEST [REMOVE]
@@ -79,6 +81,11 @@ struct ProfileBasicView: View {
     var displayImageData: Data? {
         isCurrentUser ? viewModel.profileImageData : fetchedProfileImageData
     }
+    
+    var miniImageData: Data? {
+        isCurrentUser ? viewModel.profileMiniImageData : fetchedProfileMiniImageData
+    }
+    
     
     var body: some View {
         
@@ -514,7 +521,7 @@ struct ProfileBasicView: View {
                         
                     if !isCurrentUser {
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            NavigationLink(destination: ChatsView()) {
+                            NavigationLink(destination: MessagesView(username: username, miniImageData: miniImageData)) {
                                 Image(systemName: "paperplane.fill")
                                     .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
                                     .font(.title2)
@@ -537,6 +544,7 @@ struct ProfileBasicView: View {
             // Immediately populate UI with cached data
             self.fetchedUser = cachedData.info
             self.fetchedProfileImageData = cachedData.imageData
+            self.fetchedProfileMiniImageData = cachedData.miniImageData
             self.isLoading = false
             return
         }
@@ -553,21 +561,29 @@ struct ProfileBasicView: View {
             let profile = try await fetchProfile(targetUsername: username, currentUsername: viewModel.currentUser?.username)
             
             var profileImage: Data? = nil
-            
+            var profileMiniImage: Data? = nil
+
             // Fetch the Image if URL exists
             if let urlString = profile.profileUrl, let url = URL(string: urlString) {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 profileImage = data
             }
             
+            // Fetch the Image if URL exists
+            if let miniUrlString = profile.profileMiniUrl, let miniUrl = URL(string: miniUrlString) {
+                let (data, _) = try await URLSession.shared.data(from: miniUrl)
+                profileMiniImage = data
+            }
+            
             // 3. Update State on Main Thread
             await MainActor.run {
                 self.fetchedUser = profile
                 self.fetchedProfileImageData = profileImage
+                self.fetchedProfileMiniImageData = profileMiniImage
                 self.isLoading = false
                 
                 // 4. Save to Cache immediately after fetching
-                ProfileCache.shared.save(username: username, info: profile, imageData: profileImage)
+                ProfileCache.shared.save(username: username, info: profile, imageData: profileImage, miniImageData: profileMiniImage)
                 //print("💾 [ProfileBasicView] Saved \(username) to Cache")
             }
         } catch {

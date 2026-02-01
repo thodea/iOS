@@ -52,6 +52,7 @@ class ProfileCache: ObservableObject {
     struct CachedProfileData {
         var info: ProfileInfo
         var imageData: Data?
+        var miniImageData: Data?
     }
     
     // Key = Username
@@ -61,8 +62,8 @@ class ProfileCache: ObservableObject {
         return storage[username]
     }
     
-    func save(username: String, info: ProfileInfo, imageData: Data?) {
-        storage[username] = CachedProfileData(info: info, imageData: imageData)
+    func save(username: String, info: ProfileInfo, imageData: Data?, miniImageData: Data?) {
+        storage[username] = CachedProfileData(info: info, imageData: imageData, miniImageData: miniImageData)
     }
     
     // Update follower count in cache without re-fetching
