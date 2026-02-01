@@ -10,7 +10,14 @@ import SwiftUI
 
 struct ChatsView: View {
     @Environment(\.presentationMode) var presentationMode
-
+    let mockUser = ProfileUserInfo(
+        username: "nikolay_p",
+        imageURL: "https://picsum.photos/200", // A valid random image for testing
+        deleted: false,
+        followers: 128,
+        thoughts: 42,
+        followedAt: Date()
+    )
     
     var body: some View {
             VStack(spacing: 16) {
@@ -18,8 +25,10 @@ struct ChatsView: View {
                 /*HStack(){
                     Text("chats")
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8).font(.system(size: 19)).foregroundColor(.white.opacity(0.6))*/
-                                    
-                NavigationLink(destination: MessagesView()) {
+                                        
+               
+                
+                NavigationLink(destination: MessagesView(username: mockUser.username, miniImageData: nil)) {
                                 ChatView(chat: mockThought)
                             }
                 

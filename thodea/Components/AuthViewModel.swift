@@ -24,6 +24,7 @@ class AuthViewModel: ObservableObject {
     
     // TEST
     @Published var profileImageData: Data? = nil
+    @Published var profileMiniImageData: Data? = nil
     @Published var profileImageExtension: String? = nil
     
     @Published var isUploading: Bool = false
@@ -232,6 +233,21 @@ class AuthViewModel: ObservableObject {
                             let (data, _) = try await URLSession.shared.data(from: url)
                             await MainActor.run {
                                 self.profileImageData = data
+                            }
+                        } catch {
+                            print("❌ Failed to download profile image: \(error)")
+                        }
+                    }
+                }
+                
+                if let profileMiniUrlString = profileMiniUrl,
+                   let url = URL(string: profileMiniUrlString) {
+
+                    Task {
+                        do {
+                            let (data, _) = try await URLSession.shared.data(from: url)
+                            await MainActor.run {
+                                self.profileMiniImageData = data
                             }
                         } catch {
                             print("❌ Failed to download profile image: \(error)")
