@@ -11,6 +11,9 @@ import SwiftUI
 struct MessagesView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject var chatHelper = ChatHelper()
+    @State private var showDeleteOptions = false
+    @State private var showDeleteConfirmation = false
+    
     let username: String
     let miniImageData: Data?
     
@@ -27,6 +30,7 @@ struct MessagesView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color(red: 17/255, green: 24/255, blue: 39/255), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .preferredColorScheme(.dark)
         .toolbar {
             // Wrap both the back button and the user info in one HStack
             ToolbarItem(placement: .navigationBarLeading) {
@@ -77,15 +81,34 @@ struct MessagesView: View {
                 }
             }
             
+            
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    // Your action here
-                }) {
+                Menu {
+                    // Initial "Delete" option (corresponds to setDeleteConvo(true))
+                    NavigationLink(destination: ChatsView()) {                        Label("Chats", systemImage: "envelope")
+                    }
+                    
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Chat", systemImage: "trash")
+                    }
+                } label: {
                     Image(systemName: "ellipsis")
                         .rotationEffect(.degrees(90))
                         .font(.title2)
                         .padding(.trailing, -8)
                         .foregroundColor(Color(uiColor: .systemGray))
+                }
+                // The "Are you sure?" confirmation dialog (corresponds to deleteConvoConfirm)
+                .confirmationDialog("Delete chat?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+                    Button("Yes", role: .destructive) {
+                        // handleSpeakDelete(convoData?.id)
+                        print("Deleting...")
+                    }
+                    Button("No", role: .cancel) {
+                        showDeleteConfirmation = false
+                    }
                 }
             }
         }
@@ -108,5 +131,6 @@ struct MessagesView_Previews: PreviewProvider {
         NavigationStack {
             MessagesView(username: mockUser.username, miniImageData: nil)
         }
+        .preferredColorScheme(.dark)
     }
 }

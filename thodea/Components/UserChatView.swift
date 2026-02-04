@@ -30,11 +30,11 @@ struct UserChatView: View {
                     messageList
                 }
                 .onChange(of: chatHelper.realTimeMessages.count) { _ in
-                    scrollToBottom(proxy)
+                    scrollToBottom(proxy, animate: true)
                 }
             }
             .onAppear {
-                scrollToBottom(proxy)
+                scrollToBottom(proxy, animate: false)
             }
         }
     }
@@ -91,9 +91,13 @@ struct UserChatView: View {
         }
     }
 
-    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animate: Bool = true) {
         if let lastMessage = chatHelper.realTimeMessages.last {
-            withAnimation {
+            if animate {
+                withAnimation {
+                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                }
+            } else {
                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
             }
         }
