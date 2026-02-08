@@ -12,6 +12,7 @@ struct ContentMessageView: View {
     var contentMessage: String
     var isCurrentUser: Bool
     var createdAt: Date?
+    var onDelete: () -> Void // Add this callback
     
     @State private var currentTime = Date()
 
@@ -45,6 +46,16 @@ struct ContentMessageView: View {
     var body: some View {
         VStack(alignment: isCurrentUser ? .trailing : .leading) {
             HStack {
+                
+                // Add heart at the end for the other user
+                if isCurrentUser {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.red)
+                        .opacity(0)// Set color based on tapped state
+                        //.scaleEffect(heartScale) // Apply scaling effect
+                }
+                
                Text(contentMessage)
                    .padding(12)
                    .font(.system(size: 18))
@@ -63,16 +74,63 @@ struct ContentMessageView: View {
             }
             .padding(isCurrentUser ? .leading : .trailing, 30)
 
-           
-            // Display the formatted time
-           Text(timeAgo)
-                .font(.system(size: 16))
-                .foregroundColor(.gray.opacity(0.93))
-                .italic()
+            HStack {
+                // Display the formatted time
+                Text(timeAgo)
+                    .font(.system(size: 16))
+                    .foregroundColor(.gray.opacity(0.93))
+                    .italic()
+                // Only show ellipsis for the current user
+                if isCurrentUser {
+                    Menu {
+                        Button(role: .destructive) {
+                            onDelete()
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.gray.opacity(0.93))
+                            // Adds a little padding to make it easier to tap
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 10)
+                    }
+                }
+            }
         }
+        .preferredColorScheme(.dark)
         .onAppear {
             // Start the timer when the view appears
             startTimer()
         }
+    }
+}
+
+struct ContentMessageView_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            // Dark background to match your app theme
+            Color(red: 17/255, green: 24/255, blue: 39/255)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                // 1. Preview for the Current User (Right side, dark blue)
+                ContentMessageView(
+                    contentMessage: "Hey! This is a message from me.",
+                    isCurrentUser: true,
+                    createdAt: Date().addingTimeInterval(-30),
+                    onDelete: { print("Delete tapped in preview") }
+                )
+                // 2. Preview for the Other User (Left side, gray/blue with heart)
+                ContentMessageView(
+                    contentMessage: "And this is a reply from the other person with a heart icon.",
+                    isCurrentUser: false,
+                    createdAt: Date().addingTimeInterval(-3600),
+                    onDelete: { print("Delete tapped in preview") }
+                    )
+            }
+            .padding()
+        }.preferredColorScheme(.dark)
     }
 }

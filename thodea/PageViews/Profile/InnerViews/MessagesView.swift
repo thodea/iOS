@@ -97,9 +97,13 @@ struct MessagesView: View {
                     Image(systemName: "ellipsis")
                         .rotationEffect(.degrees(90))
                         .font(.title2)
-                        .padding(.trailing, -8)
+                        .padding(.trailing, -13)
+                        .contentShape(Rectangle())
+                        .padding(.leading, 10)
+                        .padding(.vertical, 6)
                         .foregroundColor(Color(uiColor: .systemGray))
                 }
+
                 // The "Are you sure?" confirmation dialog (corresponds to deleteConvoConfirm)
                 .confirmationDialog("Delete chat?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
                     Button("Yes", role: .destructive) {
@@ -127,10 +131,50 @@ struct MessagesView_Previews: PreviewProvider {
             followedAt: Date()
         )
         
-        // 2. Pass the mock user into the view
         NavigationStack {
             MessagesView(username: mockUser.username, miniImageData: nil)
+                .environmentObject(mockAuthViewModel)
         }
         .preferredColorScheme(.dark)
     }
+    
+    // Move the logic here
+    static var mockAuthViewModel: AuthViewModel {
+        let viewModel = AuthViewModel()
+        viewModel.currentUser = User(
+            username: "Me",
+            followers: 0,
+            followings: 0,
+            thoughts: 0,
+            chatRequest: false,
+            newChat: false,
+            bio: nil,
+            registeredAt: Date(),
+            darkMode: true,
+            following: [],
+            profileUrl: nil,
+            profileMiniUrl: nil,
+            deleted: false
+        )
+        return viewModel
+    }
+    
+    /*static var previews: some View {
+        let mockUser = ProfileUserInfo(
+            username: "nikolay_p",
+            imageURL: "https://picsum.photos/200", // A valid random image for testing
+            deleted: false,
+            followers: 128,
+            thoughts: 42,
+            followedAt: Date()
+        )
+        
+        
+        // 2. Pass the mock user into the view
+        NavigationStack {
+            MessagesView(username: mockUser.username, miniImageData: nil)
+                .environmentObject(AuthViewModel())
+        }
+        .preferredColorScheme(.dark)
+    }*/
 }
