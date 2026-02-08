@@ -15,7 +15,9 @@ struct ContentMessageView: View {
     var onDelete: () -> Void // Add this callback
     
     @State private var currentTime = Date()
-
+    @State private var isLiked: Bool = false
+    @State private var heartScale: CGFloat = 1.0
+    
     // Computed property to format the date
     var timeAgo: String {
         guard let createdAt = createdAt else { return "Unknown time" }
@@ -65,12 +67,33 @@ struct ContentMessageView: View {
                    .padding(.vertical, 4)
 
                // Add heart at the end for the other user
-               if !isCurrentUser {
-                   Image(systemName: "heart")
-                       .font(.system(size: 20))
-                       .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255)) // Set color based on tapped state
-                       //.scaleEffect(heartScale) // Apply scaling effect
-               }
+                if !isCurrentUser {
+                    Button(action: {
+                        // 1. Toggle the color/fill immediately
+                        isLiked.toggle()
+                        
+                        // 2. Trigger the "Pop" animation
+                        if isLiked {
+                            withAnimation(.spring(response: 0.15, dampingFraction: 0.4)) {
+                                heartScale = 1.2 // Higher value makes the pop feel more energetic
+                            }
+                            
+                            // 3. Reset the scale back to normal after 0.2-0.3 seconds
+                            // (0.5s is usually too slow for a "snappy" feel, but you can adjust)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    heartScale = 1.0
+                                }
+                            }
+                        }
+                    }) {
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .font(.system(size: 20))
+                            .foregroundColor(isLiked ? .red : Color(red: 156/255, green: 163/255, blue: 175/255))
+                            .scaleEffect(heartScale) // Driven by the independent scale state
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
             }
             .padding(isCurrentUser ? .leading : .trailing, 30)
 
