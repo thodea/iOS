@@ -33,13 +33,9 @@ struct UserChatView: View {
                 }
                 // Use the closure that provides both old and new values
                 .onChange(of: chatHelper.realTimeMessages.count) { newCount in
-                    print("DEBUG: Old Count: \(previousMessageCount) | New Count: \(newCount)")
                     
                     if newCount > previousMessageCount && previousMessageCount != 0 {
-                        print("DEBUG: Scrolling to bottom")
                         scrollToBottom(proxy, animate: true)
-                    } else {
-                        print("DEBUG: Deletion detected - ignoring scroll")
                     }
                     previousMessageCount = newCount
                 }
