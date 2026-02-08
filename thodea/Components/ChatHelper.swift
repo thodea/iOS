@@ -15,7 +15,7 @@ class ChatHelper: ObservableObject {
     init() {
          let mockUsers = [
             User(
-                username: "Alice",
+                username: "Me",
                 followers: 120,
                 followings: 85,
                 thoughts: 42,
@@ -30,7 +30,22 @@ class ChatHelper: ObservableObject {
                 deleted: false
             ),
             User(
-                username: "Bob",
+                username: "delete",
+                followers: 200,
+                followings: 150,
+                thoughts: 30,
+                chatRequest: false,
+                newChat: true,
+                bio: "Just a regular Bob.",
+                registeredAt: Date(),
+                darkMode: true,
+                following: ["Alice", "Charlie"],
+                profileUrl: "https://example.com/images/bob.jpg",
+                profileMiniUrl: "https://example.com/images/bob-mini.jpg",
+                deleted: false
+            ),
+            User(
+                username: "Me",
                 followers: 200,
                 followings: 150,
                 thoughts: 30,
@@ -46,13 +61,21 @@ class ChatHelper: ObservableObject {
             )
          ]
 
-         realTimeMessages = (1...15).map { i in
+         /*realTimeMessages = (1...3).map { i in
              Message(
                  content: "Mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
-                 user: mockUsers[i % 2],
+                 user: mockUsers[i], //mockUsers[i % 2],
                  createdAt: Date(timeIntervalSince1970: 1734296943 + Double(i * 60)) // Each message 1 minute apart
              )
-         }
+         }*/
+        realTimeMessages = (1...10).map { i in
+            Message(
+                content: "Mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
+                user: mockUsers[i % mockUsers.count], // Safely wraps around
+                createdAt: Date().addingTimeInterval(Double(-600 + (i * 60)))
+            )
+        }
+        
      }
 
     
@@ -73,5 +96,9 @@ class ChatHelper: ObservableObject {
         let newMessage = Message(content: content, user: currentUser, createdAt: Date())
         
         realTimeMessages.append(newMessage)
+    }
+    
+    func deleteMessage(id: UUID) {
+        realTimeMessages.removeAll { $0.id == id }
     }
 }

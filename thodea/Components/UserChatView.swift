@@ -10,7 +10,9 @@ import SwiftUI
 struct UserChatView: View {
     @State private var typingMessage: String = ""
     @EnvironmentObject var chatHelper: ChatHelper
-
+    @EnvironmentObject var viewModel: AuthViewModel
+    @State private var previousMessageCount: Int = 0
+    
     var body: some View {
         VStack(spacing: 0) {
             messageScrollView
@@ -29,11 +31,21 @@ struct UserChatView: View {
                 VStack {
                     messageList
                 }
-                .onChange(of: chatHelper.realTimeMessages.count) { _ in
-                    scrollToBottom(proxy, animate: true)
+                // Use the closure that provides both old and new values
+                .onChange(of: chatHelper.realTimeMessages.count) { newCount in
+                    print("DEBUG: Old Count: \(previousMessageCount) | New Count: \(newCount)")
+                    
+                    if newCount > previousMessageCount && previousMessageCount != 0 {
+                        print("DEBUG: Scrolling to bottom")
+                        scrollToBottom(proxy, animate: true)
+                    } else {
+                        print("DEBUG: Deletion detected - ignoring scroll")
+                    }
+                    previousMessageCount = newCount
                 }
             }
             .onAppear {
+                previousMessageCount = chatHelper.realTimeMessages.count
                 scrollToBottom(proxy, animate: false)
             }
         }
@@ -41,8 +53,12 @@ struct UserChatView: View {
 
     private var messageList: some View {
         ForEach(chatHelper.realTimeMessages, id: \.id) { msg in
-            ContentMessageView(contentMessage: msg.content, isCurrentUser: true, createdAt: msg.createdAt)
-                .frame(maxWidth: .infinity, alignment: true ? .trailing : .leading)
+            let isCurrentUser = viewModel.currentUser?.username == msg.user.username
+            ContentMessageView(contentMessage: msg.content, isCurrentUser: isCurrentUser, createdAt: msg.createdAt,
+               onDelete: {
+                   chatHelper.deleteMessage(id: msg.id)
+               })
+                .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
                 .padding(.horizontal)
         }
     }
@@ -62,19 +78,25 @@ struct UserChatView: View {
             .padding(.trailing, 4)
             .buttonStyle(.plain)
             
-            TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.white.opacity(0.7)))
-                .textFieldStyle(DefaultTextFieldStyle())
-                .frame(minHeight: 40)
-                .lineLimit(6)
-                .foregroundColor(.white)
-                .font(.system(size: 22))
-                .padding(.leading, 4)
-                .overlay(
-                    Rectangle()
-                        .frame(height: 2)
-                        .foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)),
-                    alignment: .bottom
-                )
+            TextField(
+                "Message",
+                text: $typingMessage,
+                // Use the prompt parameter here to ensure it stays gray
+                prompt: Text("Message").foregroundColor(.gray),
+                axis: .vertical
+            )
+            .lineLimit(1...6)
+            .textFieldStyle(.plain)
+            .frame(minHeight: 40)
+            .foregroundColor(.white)
+            .font(.system(size: 22))
+            .padding(.leading, 4)
+            .overlay(
+                Rectangle()
+                    .frame(height: 2)
+                    .foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)),
+                alignment: .bottom
+            )
 
             Button(action: sendMessage) {
                 Image(systemName: "paperplane.fill")
@@ -112,7 +134,29 @@ struct UserChatView: View {
 struct UserChatView_Previews: PreviewProvider {
     static var previews: some View {
         UserChatView()
-            .environmentObject(ChatHelper()) // Provide an instance of ChatHelper
+            .environmentObject(ChatHelper())
+            .environmentObject(mockAuthViewModel)
+            .preferredColorScheme(.dark)
+    }
+    
+    // Move the logic here
+    static var mockAuthViewModel: AuthViewModel {
+        let viewModel = AuthViewModel()
+        viewModel.currentUser = User(
+            username: "Me",
+            followers: 0,
+            followings: 0,
+            thoughts: 0,
+            chatRequest: false,
+            newChat: false,
+            bio: nil,
+            registeredAt: Date(),
+            darkMode: true,
+            following: [],
+            profileUrl: nil,
+            profileMiniUrl: nil,
+            deleted: false
+        )
+        return viewModel
     }
 }
-
