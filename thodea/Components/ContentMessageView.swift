@@ -7,6 +7,7 @@
 
 
 import SwiftUI
+import AVKit // <--- ADD THIS
 
 struct ContentMessageView: View {
     var contentMessage: String
@@ -14,15 +15,18 @@ struct ContentMessageView: View {
     var createdAt: Date?
     var onDelete: () -> Void // Add this callback
     
-    @State private var currentTime = Date()
+    // --- NEW: Optional Media Properties ---
+    var attachedImage: UIImage? = nil
+    var attachedVideoURL: URL? = nil
+    // --------------------------------------
+
     @State private var isLiked: Bool = false
     @State private var heartScale: CGFloat = 1.0
-    
-    // Computed property to format the date
-    var timeAgo: String {
-        guard let createdAt = createdAt else { return "Unknown time" }
+    @State private var player: AVPlayer? = nil
 
-        let timeElapsed = Int(currentTime.timeIntervalSince(createdAt))
+    // Computed property to format the date
+    func timeAgo(from createdAt: Date, now: Date) -> String {
+        let timeElapsed = Int(now.timeIntervalSince(createdAt))
 
         if timeElapsed < 60 {
             return "\(timeElapsed) second\(timeElapsed == 1 ? "" : "s") ago"
@@ -37,49 +41,62 @@ struct ContentMessageView: View {
             return "\(days) day\(days == 1 ? "" : "s") ago"
         }
     }
-    // Function to start a timer that updates every second
-    func startTimer() {
-        // Invalidate any previous timers and start a new one
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            self.currentTime = Date() // Update the current time every second
-        }
-    }
+
 
     var body: some View {
         VStack(alignment: isCurrentUser ? .trailing : .leading) {
-            HStack {
+            HStack(alignment: .bottom) { // Align items to bottom so hearts stay near text
                 
-                // Add heart at the end for the other user
+                // --- CURRENT USER HEART (Left Side) ---
                 if isCurrentUser {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 20))
                         .foregroundColor(.red)
-                        .opacity(0)// Set color based on tapped state
-                        //.scaleEffect(heartScale) // Apply scaling effect
+                        .opacity(0) // Hidden placeholder for alignment if needed, or keeping your existing logic
                 }
                 
-               Text(contentMessage)
-                   .padding(12)
-                   .font(.system(size: 18))
-                   .foregroundColor(Color.white)
-                   .background(isCurrentUser ? Color(red: 23/255, green: 37/255, blue: 84/255) : Color(red: 30/255, green: 41/255, blue: 59/255))
-                   .cornerRadius(10)
-                   .padding(.vertical, 4)
-
-               // Add heart at the end for the other user
+                // --- MESSAGE CONTENT STACK (Media + Text) ---
+                VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
+                    
+                    // 1. VIDEO ATTACHMENT
+                    if let videoURL = attachedVideoURL {
+                        MessageVideoView(url: videoURL)
+                            .padding(.bottom, 2)
+                    }
+                    // 2. IMAGE ATTACHMENT
+                    else if let image = attachedImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            // CSS: object-cover
+                            .aspectRatio(contentMode: .fill)
+                            // CSS: min-w-[125px] min-h-[125px] max-h-[300px]
+                            .frame(minWidth: 125, minHeight: 125)
+                            .frame(maxHeight: 300)
+                            // CSS: rounded-md
+                            .cornerRadius(10)
+                            .clipped() // Essential for object-cover behavior
+                            .padding(.bottom, 2)
+                    }
+                    
+                    // 3. TEXT BUBBLE
+                    if !contentMessage.isEmpty {
+                        Text(contentMessage)
+                            .padding(12)
+                            .font(.system(size: 18))
+                            .foregroundColor(Color.white)
+                            .background(isCurrentUser ? Color(red: 23/255, green: 37/255, blue: 84/255) : Color(red: 30/255, green: 41/255, blue: 59/255))
+                            .cornerRadius(10)
+                    }
+                }
+                
+                // --- OTHER USER HEART (Right Side - Interactable) ---
                 if !isCurrentUser {
                     Button(action: {
-                        // 1. Toggle the color/fill immediately
                         isLiked.toggle()
-                        
-                        // 2. Trigger the "Pop" animation
                         if isLiked {
                             withAnimation(.spring(response: 0.15, dampingFraction: 0.4)) {
-                                heartScale = 1.2 // Higher value makes the pop feel more energetic
+                                heartScale = 1.2
                             }
-                            
-                            // 3. Reset the scale back to normal after 0.2-0.3 seconds
-                            // (0.5s is usually too slow for a "snappy" feel, but you can adjust)
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                     heartScale = 1.0
@@ -90,20 +107,24 @@ struct ContentMessageView: View {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
                             .font(.system(size: 20))
                             .foregroundColor(isLiked ? .red : Color(red: 156/255, green: 163/255, blue: 175/255))
-                            .scaleEffect(heartScale) // Driven by the independent scale state
+                            .scaleEffect(heartScale)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(isCurrentUser ? .leading : .trailing, 30)
 
+            // --- TIMESTAMP & MENU ROW ---
             HStack {
-                // Display the formatted time
-                Text(timeAgo)
-                    .font(.system(size: 16))
-                    .foregroundColor(.gray.opacity(0.93))
-                    .italic()
-                // Only show ellipsis for the current user
+                if let createdAt = createdAt {
+                    TimelineView(.periodic(from: Date(), by: 1)) { context in
+                        Text(timeAgo(from: createdAt, now: context.date))
+                            .font(.system(size: 16))
+                            .foregroundColor(.gray.opacity(0.93))
+                            .italic()
+                    }
+                }
+                
                 if isCurrentUser {
                     Menu {
                         Button(role: .destructive) {
@@ -115,7 +136,6 @@ struct ContentMessageView: View {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.gray.opacity(0.93))
-                            // Adds a little padding to make it easier to tap
                             .padding(.horizontal, 4)
                             .padding(.vertical, 10)
                     }
@@ -123,37 +143,61 @@ struct ContentMessageView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .onAppear {
-            // Start the timer when the view appears
-            startTimer()
+    }
+}
+
+// MARK: - Update Preview to Test
+struct ContentMessageView_Previews: PreviewProvider {
+    static var previews: some View {
+        ZStack {
+            Color(red: 17/255, green: 24/255, blue: 39/255).ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                // 1. Text Only
+                ContentMessageView(
+                    contentMessage: "Text only message",
+                    isCurrentUser: true,
+                    createdAt: Date(),
+                    onDelete: {}
+                )
+                
+                // 2. Text + Image (Other User)
+                ContentMessageView(
+                    contentMessage: "Look at this photo!",
+                    isCurrentUser: false,
+                    createdAt: Date(),
+                    onDelete: {},
+                    attachedImage: UIImage(systemName: "photo.fill")?.withTintColor(.purple, renderingMode: .alwaysOriginal)
+                )
+            }
+            .padding()
         }
     }
 }
 
-struct ContentMessageView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            // Dark background to match your app theme
-            Color(red: 17/255, green: 24/255, blue: 39/255)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                // 1. Preview for the Current User (Right side, dark blue)
-                ContentMessageView(
-                    contentMessage: "Hey! This is a message from me.",
-                    isCurrentUser: true,
-                    createdAt: Date().addingTimeInterval(-30),
-                    onDelete: { print("Delete tapped in preview") }
-                )
-                // 2. Preview for the Other User (Left side, gray/blue with heart)
-                ContentMessageView(
-                    contentMessage: "And this is a reply from the other person with a heart icon.",
-                    isCurrentUser: false,
-                    createdAt: Date().addingTimeInterval(-3600),
-                    onDelete: { print("Delete tapped in preview") }
-                    )
+struct MessageVideoView: View {
+    let url: URL
+    @State private var player: AVPlayer
+    
+    init(url: URL) {
+        self.url = url
+        _player = State(initialValue: AVPlayer(url: url))
+    }
+    
+    var body: some View {
+        VideoPlayer(player: player)
+            .frame(height: 400)
+            .frame(maxWidth: 300)
+            .cornerRadius(10)
+            .onAppear {
+                player.pause()   // prevents autoplay
             }
-            .padding()
-        }.preferredColorScheme(.dark)
+            .onTapGesture {
+                if player.timeControlStatus == .playing {
+                    player.pause()
+                } else {
+                    player.play()
+                }
+            }
     }
 }
