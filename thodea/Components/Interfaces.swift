@@ -113,11 +113,25 @@ struct User {
         
 }
 
-struct Message: Identifiable {
+
+struct Message: Identifiable, Hashable {
     let id = UUID()
     let content: String
     let user: User
     let createdAt: Date
+    
+    // Add these optional properties
+    var attachedImage: UIImage?
+    var attachedVideoURL: URL?
+    
+    // Conformance for Hashable (needed for ScrollView logic usually)
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: Message, rhs: Message) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
 let mockThought = Thought(

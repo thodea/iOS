@@ -71,12 +71,17 @@ struct UserChatView: View {
     private var messageList: some View {
         ForEach(chatHelper.realTimeMessages, id: \.id) { msg in
             let isCurrentUser = viewModel.currentUser?.username == msg.user.username
-            ContentMessageView(contentMessage: msg.content, isCurrentUser: isCurrentUser, createdAt: msg.createdAt,
-               onDelete: {
-                   chatHelper.deleteMessage(id: msg.id)
-               })
-                .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
-                .padding(.horizontal)
+            // Pass the new parameters here
+            ContentMessageView(
+                contentMessage: msg.content,
+                isCurrentUser: isCurrentUser,
+                createdAt: msg.createdAt,
+                onDelete: { chatHelper.deleteMessage(id: msg.id) },
+                attachedImage: msg.attachedImage,       // <--- INJECT
+                attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
+            )
+            .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
+            .padding(.horizontal)
         }
     }
 
@@ -92,7 +97,7 @@ struct UserChatView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: 26, height: 26)
-                            .padding(3)
+                            .padding(.bottom, 3)
                             .foregroundColor(.blue)
                     }
                     .onChange(of: selectedItem) { newItem in
@@ -106,7 +111,7 @@ struct UserChatView: View {
                 TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.gray), axis: .vertical)
                     .lineLimit(1...6)
                     .textFieldStyle(.plain)
-                    .frame(minHeight: 40)
+                    .frame(minHeight: 32)
                     .foregroundColor(.white)
                     .font(.system(size: 22))
                     .padding(.leading, 4)
@@ -118,7 +123,7 @@ struct UserChatView: View {
                         .scaledToFit()
                         .frame(width: 28, height: 28)
                         .foregroundColor(.gray)
-                        .padding(10)
+                        .padding(.horizontal, 10)
                 }
                 .disabled(typingMessage.isEmpty && selectedImage == nil && selectedVideoURL == nil)
             }
@@ -232,9 +237,15 @@ struct UserChatView: View {
     }
 
     private func sendMessage() {
-        chatHelper.sendMessage(typingMessage)
+        // Pass the state variables (selectedImage, selectedVideoURL) to the helper
+        chatHelper.sendMessage(
+            typingMessage,
+            image: selectedImage,
+            videoURL: selectedVideoURL
+        )
+        
+        // Reset UI
         typingMessage = ""
-        // Also clear media on send
         selectedImage = nil
         selectedVideoURL = nil
         selectedItem = nil

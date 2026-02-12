@@ -79,21 +79,34 @@ class ChatHelper: ObservableObject {
      }
 
     
-    func sendMessage(_ content: String) {
-        guard !content.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+    func sendMessage(_ content: String, image: UIImage? = nil, videoURL: URL? = nil) {
+        // Guard: ensure we have at least text OR media
+        guard !content.trimmingCharacters(in: .whitespaces).isEmpty || image != nil || videoURL != nil else { return }
         
         let currentUser = User(
-                username: "Me",
-                registeredAt: Date(),
-                darkMode: true,
-                followers: 0,
-                followings: 0,
-                thoughts: 0,
-                profileMiniUrl: nil,
-                profileUrl: nil,
-                bio: nil
-            )
-        let newMessage = Message(content: content, user: currentUser, createdAt: Date())
+            username: "Me",
+            followers: 0,
+            followings: 0,
+            thoughts: 0,
+            chatRequest: false,
+            newChat: false,
+            bio: nil,
+            registeredAt: Date(),
+            darkMode: true,
+            following: [],
+            profileUrl: nil,
+            profileMiniUrl: nil,
+            deleted: false
+        )
+        
+        // Init message with the new optionals
+        let newMessage = Message(
+            content: content,
+            user: currentUser,
+            createdAt: Date(),
+            attachedImage: image,     // <--- Pass Image
+            attachedVideoURL: videoURL // <--- Pass Video
+        )
         
         realTimeMessages.append(newMessage)
     }
