@@ -107,7 +107,7 @@ struct UserChatView: View {
                     }
                     .padding(.trailing, 4)
                 }
-
+                
                 TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.gray), axis: .vertical)
                     .lineLimit(1...6)
                     .textFieldStyle(.plain)
@@ -116,7 +116,7 @@ struct UserChatView: View {
                     .font(.system(size: 22))
                     .padding(.leading, 4)
                     .overlay(Rectangle().frame(height: 2).foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)), alignment: .bottom)
-
+                
                 Button(action: sendMessage) {
                     Image(systemName: "paperplane.fill")
                         .resizable()
@@ -125,7 +125,7 @@ struct UserChatView: View {
                         .foregroundColor(.gray)
                         .padding(.horizontal, 10)
                 }
-                .disabled(typingMessage.isEmpty && selectedImage == nil && selectedVideoURL == nil)
+                .disabled((typingMessage.isEmpty && selectedImage == nil && selectedVideoURL == nil) || viewModel.currentUser == nil)
             }
         }
     }
@@ -237,9 +237,15 @@ struct UserChatView: View {
     }
 
     private func sendMessage() {
+        
+        guard let user = viewModel.currentUser else {
+                print("[DEBUG] No current user found in AuthViewModel")
+                return
+            }
         // Pass the state variables (selectedImage, selectedVideoURL) to the helper
         chatHelper.sendMessage(
             typingMessage,
+            user: user,
             image: selectedImage,
             videoURL: selectedVideoURL
         )
