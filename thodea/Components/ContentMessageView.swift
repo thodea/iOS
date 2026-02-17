@@ -9,6 +9,22 @@
 import SwiftUI
 import AVKit // <--- ADD THIS
 
+
+struct PlayerViewController: UIViewControllerRepresentable {
+    let player: AVPlayer
+    
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.showsPlaybackControls = true
+        controller.entersFullScreenWhenPlaybackBegins = false
+        controller.exitsFullScreenWhenPlaybackEnds = true
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
+}
+
 struct ContentMessageView: View {
     var contentMessage: String
     var isCurrentUser: Bool
@@ -20,6 +36,8 @@ struct ContentMessageView: View {
     var attachedVideoURL: URL? = nil
     // --------------------------------------
 
+    @State private var isPreviewOpen: Bool = false // State for the preview
+    
     @State private var isLiked: Bool = false
     @State private var heartScale: CGFloat = 1.0
     @State private var player: AVPlayer? = nil
@@ -41,6 +59,7 @@ struct ContentMessageView: View {
             return "\(days) day\(days == 1 ? "" : "s") ago"
         }
     }
+
 
 
     var body: some View {
@@ -76,6 +95,9 @@ struct ContentMessageView: View {
                             .cornerRadius(10)
                             .clipped() // Essential for object-cover behavior
                             .padding(.bottom, 2)
+                            .onTapGesture {
+                                isPreviewOpen = true
+                            }
                     }
                     
                     // 3. TEXT BUBBLE
@@ -143,7 +165,40 @@ struct ContentMessageView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .fullScreenCover(isPresented: $isPreviewOpen) {
+            if let image = attachedImage {
+                ZStack {
+                    Color.black.opacity(0.95)
+                        .ignoresSafeArea()
+                    
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                isPreviewOpen = false
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .symbolRenderingMode(.hierarchical)
+                                    .font(.largeTitle)
+                                    .foregroundColor(.white) // Changed to white for better contrast on black
+                                    .padding()
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+                .onTapGesture {
+                    isPreviewOpen = false
+                }
+            }
+        }
     }
+    // --- THE FULL SCREEN COVER ---
 }
 
 // MARK: - Update Preview to Test
@@ -177,7 +232,9 @@ struct ContentMessageView_Previews: PreviewProvider {
 
 struct MessageVideoView: View {
     let url: URL
+    
     @State private var player: AVPlayer
+    @State private var isPlaying = false
     
     init(url: URL) {
         self.url = url
@@ -185,19 +242,56 @@ struct MessageVideoView: View {
     }
     
     var body: some View {
-        VideoPlayer(player: player)
-            .frame(height: 400)
-            .frame(maxWidth: 300)
-            .cornerRadius(10)
-            .onAppear {
-                player.pause()   // prevents autoplay
-            }
-            .onTapGesture {
-                if player.timeControlStatus == .playing {
-                    player.pause()
-                } else {
-                    player.play()
+        ZStack {
+            
+            PlayerViewController(player: player)
+                .frame(height: 400)
+                .frame(maxWidth: 300)
+                .cornerRadius(10)
+                .onTapGesture {
+                    // Pause only if currently playing
+                    if isPlaying {
+                        pause()
+                    }
                 }
+            
+            // Overlay controls when paused
+            if !isPlaying {
+                Image(systemName: "play.circle.fill")
+                    .font(.system(size: 70))
+                    .foregroundColor(.white.opacity(0.7))
+                    .onTapGesture {
+                        play()
+                    }
             }
+
+        }
+        .onAppear {
+            player.pause()
+            isPlaying = false
+        }
+    }
+    
+    private func play() {
+        player.play()
+        isPlaying = true
+    }
+    
+    private func pause() {
+        player.pause()
+        isPlaying = false
+    }
+    
+    private func skip(seconds: Double) {
+        guard let currentItem = player.currentItem else { return }
+        
+        let currentTime = player.currentTime()
+        let newTime = CMTimeGetSeconds(currentTime) + seconds
+        let duration = CMTimeGetSeconds(currentItem.duration)
+        
+        let clampedTime = max(0, min(newTime, duration))
+        let time = CMTime(seconds: clampedTime, preferredTimescale: 600)
+        
+        player.seek(to: time)
     }
 }
