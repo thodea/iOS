@@ -70,7 +70,7 @@ class ChatHelper: ObservableObject {
          }*/
         realTimeMessages = (1...10).map { i in
             Message(
-                content: "Mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
+                content: "test.com google.com http://google.com www.thodea.com https://www.thodea.com message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
                 user: mockUsers[i % mockUsers.count], // Safely wraps around
                 createdAt: Date().addingTimeInterval(Double(-600 + (i * 60)))
             )

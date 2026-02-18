@@ -30,6 +30,9 @@ struct UserChatView: View {
     @State private var playableVideo: PlayableVideo? = nil
     @State private var showVideoLengthAlert = false
 
+    @State private var showLimitWarning = false
+    @State private var warningTimer: DispatchWorkItem? = nil
+    private let charLimit = 1000
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,6 +70,29 @@ struct UserChatView: View {
             }
         }
     }
+    
+    private func handleTextChange(_ newValue: String) {
+        if newValue.count > charLimit {
+            // 1. Trim the text
+            typingMessage = String(newValue.prefix(charLimit))
+            
+            // 2. Show the warning
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showLimitWarning = true
+            }
+            
+            // 3. Reset the 2-second timer
+            warningTimer?.cancel() // Cancel existing timer if user keeps typing
+            
+            let workItem = DispatchWorkItem {
+                withAnimation {
+                    showLimitWarning = false
+                }
+            }
+            warningTimer = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
+        }
+    }
 
     private var messageList: some View {
         ForEach(chatHelper.realTimeMessages, id: \.id) { msg in
@@ -87,6 +113,17 @@ struct UserChatView: View {
 
     private var messageInputBar: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Warning Block
+            if showLimitWarning {
+                Text("1000 char limit")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity) // Ensures it takes the width of the container
+                    .padding(.vertical, 8)
+                    .background(Color(red: 252/255, green: 165/255, blue: 165/255))
+                    .transition(.opacity)
+            }
+    
             mediaPreview
 
             HStack(alignment: .bottom, spacing: 0) {
@@ -116,6 +153,9 @@ struct UserChatView: View {
                     .font(.system(size: 22))
                     .padding(.leading, 4)
                     .overlay(Rectangle().frame(height: 2).foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)), alignment: .bottom)
+                    .onChange(of: typingMessage) { newValue in
+                                        handleTextChange(newValue)
+                                    }
                 
                 Button(action: sendMessage) {
                     Image(systemName: "paperplane.fill")
@@ -125,7 +165,7 @@ struct UserChatView: View {
                         .foregroundColor(.gray)
                         .padding(.horizontal, 10)
                 }
-                .disabled((typingMessage.isEmpty && selectedImage == nil && selectedVideoURL == nil) || viewModel.currentUser == nil)
+                .disabled(isSendDisabled)
             }
         }
     }
@@ -236,6 +276,19 @@ struct UserChatView: View {
         }
     }
 
+    private var isSendDisabled: Bool {
+        // 1. Basic validation: empty text and no media
+        let isContentEmpty = typingMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                             && selectedImage == nil
+                             && selectedVideoURL == nil
+        
+        // 2. User must be logged in
+        let noUser = viewModel.currentUser == nil
+        
+        // 3. YOUR NEW RULE: Disable if the limit warning is currently visible
+        return isContentEmpty || noUser || showLimitWarning
+    }
+    
     private func sendMessage() {
         
         guard let user = viewModel.currentUser else {

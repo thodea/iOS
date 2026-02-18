@@ -60,11 +60,33 @@ struct ContentMessageView: View {
         }
     }
 
+    private func linkifiedText(_ text: String) -> AttributedString {
+        var attributed = AttributedString(text)
+        
+        // Use NSDataDetector (Apple's native URL detector)
+        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        
+        detector?.enumerateMatches(in: text, options: [], range: nsRange) { match, _, _ in
+            guard let match = match,
+                  let range = Range(match.range, in: text),
+                  let url = match.url else { return }
+            
+            if let attributedRange = Range(match.range, in: attributed) {
+                attributed[attributedRange].link = url
+                attributed[attributedRange].foregroundColor = .blue
+                attributed[attributedRange].underlineStyle = .single
+            }
+        }
+        
+        return attributed
+    }
 
 
     var body: some View {
         VStack(alignment: isCurrentUser ? .trailing : .leading) {
-            HStack(alignment: .bottom) { // Align items to bottom so hearts stay near text
+            HStack(alignment: .center) { // Align items to bottom so hearts stay near text
                 
                 // --- CURRENT USER HEART (Left Side) ---
                 if isCurrentUser {
@@ -86,28 +108,28 @@ struct ContentMessageView: View {
                     else if let image = attachedImage {
                         Image(uiImage: image)
                             .resizable()
-                            // CSS: object-cover
                             .aspectRatio(contentMode: .fill)
-                            // CSS: min-w-[125px] min-h-[125px] max-h-[300px]
                             .frame(minWidth: 125, minHeight: 125)
                             .frame(maxHeight: 300)
-                            // CSS: rounded-md
+                            .clipped() // Keeps it visually contained
                             .cornerRadius(10)
-                            .clipped() // Essential for object-cover behavior
-                            .padding(.bottom, 2)
+                            // 👇 THE FIX: Define the hit-test shape to match the frame
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
                             .onTapGesture {
                                 isPreviewOpen = true
                             }
+                            .padding(.bottom, 2)
                     }
                     
                     // 3. TEXT BUBBLE
                     if !contentMessage.isEmpty {
-                        Text(contentMessage)
+                        Text(linkifiedText(contentMessage))
                             .padding(12)
                             .font(.system(size: 18))
                             .foregroundColor(Color.white)
                             .background(isCurrentUser ? Color(red: 23/255, green: 37/255, blue: 84/255) : Color(red: 30/255, green: 41/255, blue: 59/255))
                             .cornerRadius(10)
+                            .textSelection(.enabled)
                     }
                 }
                 
@@ -165,6 +187,10 @@ struct ContentMessageView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .environment(\.openURL, OpenURLAction { url in
+            UIApplication.shared.open(url)
+            return .handled
+        })
         .fullScreenCover(isPresented: $isPreviewOpen) {
             if let image = attachedImage {
                 ZStack {
@@ -210,7 +236,7 @@ struct ContentMessageView_Previews: PreviewProvider {
             VStack(spacing: 20) {
                 // 1. Text Only
                 ContentMessageView(
-                    contentMessage: "Text only message",
+                    contentMessage: "Text only message test.com s",
                     isCurrentUser: true,
                     createdAt: Date(),
                     onDelete: {}
