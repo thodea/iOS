@@ -66,12 +66,19 @@ struct ProfileBasicView: View {
         isCurrentUser ? viewModel.currentUser?.bio : fetchedUser?.bio
     }
     
-    var displayFollowers: Int {
-        isCurrentUser ? (viewModel.currentUser?.followers ?? 0) : (fetchedUser?.followers ?? 0)
+    var displayFollowers: Int? {
+        if isCurrentUser {
+            return viewModel.currentUser?.followers
+        }
+        // If fetchedUser is nil, this returns nil (the "loading" state)
+        return fetchedUser?.followers
     }
-    
-    var displayFollowing: Int {
-        isCurrentUser ? (viewModel.currentUser?.followings ?? 0) : (fetchedUser?.following ?? 0)
+
+    var displayFollowing: Int? {
+        if isCurrentUser {
+            return viewModel.currentUser?.followings
+        }
+        return fetchedUser?.following
     }
     
     var displayThoughts: Int {
@@ -84,6 +91,19 @@ struct ProfileBasicView: View {
     
     var miniImageData: Data? {
         isCurrentUser ? viewModel.profileMiniImageData : fetchedProfileMiniImageData
+    }
+    
+    // Helper within the View or as a private func
+    private func followerText(for count: Int?) -> String {
+        guard let count = count else { return "" } // Show nothing while loading
+        let formatted = formatNumber(abs(count))
+        let label = abs(count) == 1 ? "follower" : "followers"
+        return "\(formatted) \(label)"
+    }
+
+    private func followingText(for count: Int?) -> String {
+        guard let count = count else { return "" }
+        return "\(formatNumber(count)) following"
     }
     
     
@@ -196,14 +216,16 @@ struct ProfileBasicView: View {
                     
                     VStack() {
                         // 1. Followers Link
+                        let followersCount = abs(displayFollowers ?? 0)
+                        let hasFollowers = followersCount > 0
+                    
                         NavigationLink(destination: FollowsView(
-                            username: viewModel.currentUser?.username ?? "",
+                            username: username,
                             listType: "followers",
                             dateDisabled: false
                         )) {
                             HStack {
-                                let followers = abs(displayFollowers)
-                                Text("\(formatNumber(followers)) \(followers == 1 ? "follower" : "followers")")
+                                Text(followerText(for: displayFollowers))
                                     .font(.system(size: 17)).fixedSize()
                                     .foregroundColor(.white.opacity(0.9))
                                 
@@ -224,18 +246,22 @@ struct ProfileBasicView: View {
                             }
                         }
                         .buttonStyle(.plain) // Prevents blue text coloring
+                        .allowsHitTesting(hasFollowers)
                         
                         // 2. Following Link
+                        let followingCount = abs(displayFollowing ?? 0)
+                        let hasFollowing = followingCount > 0
+                
                         NavigationLink(destination: FollowsView(
-                            username: viewModel.currentUser?.username ?? "",
+                            username: username,
                             listType: "following",
                             dateDisabled: false
                         )) {
                             HStack {
-                                Text("\(formatNumber(displayFollowing)) following")
+                                Text(followingText(for: displayFollowing))
                                     .font(.system(size: 17)).fixedSize()
                                     .foregroundColor(.white.opacity(0.9))
-                                
+
                                 Spacer()
                                 
                                 HStack(spacing: 0) {
@@ -253,6 +279,7 @@ struct ProfileBasicView: View {
                             }
                         }
                         .buttonStyle(.plain) // Prevents blue text coloring
+                        .allowsHitTesting(hasFollowing)
                         
                         if !isCurrentUser {
                             
