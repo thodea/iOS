@@ -70,7 +70,7 @@ struct ContentMessageView: View {
         
         detector?.enumerateMatches(in: text, options: [], range: nsRange) { match, _, _ in
             guard let match = match,
-                  let range = Range(match.range, in: text),
+                  let _ = Range(match.range, in: text),
                   let url = match.url else { return }
             
             if let attributedRange = Range(match.range, in: attributed) {
