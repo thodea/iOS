@@ -31,6 +31,7 @@ class AuthViewModel: ObservableObject {
     @Published var isDeleting: Bool = false
 
     init() {
+        checkFirstRun()
         self.userSession = Auth.auth().currentUser
         // Check if userExistsInFirestore has been defined (is not nil)
         if self.userExistsInFirestore != nil {
@@ -58,6 +59,15 @@ class AuthViewModel: ObservableObject {
                     
                     self.userSession = authResult?.user
                 }
+        }
+    }
+    
+    func checkFirstRun() {
+        let hasRunBefore = UserDefaults.standard.bool(forKey: "hasRunBefore")
+        if !hasRunBefore {
+            // This is a fresh install or first run after deletion
+            signOut()
+            UserDefaults.standard.set(true, forKey: "hasRunBefore")
         }
     }
     
@@ -366,56 +376,74 @@ class AuthViewModel: ObservableObject {
     }
     
     func removeProfileImage(skipLocalCleanup: Bool = false) async throws {
-            guard let username = currentUser?.username else { return }
-
-            // Build your API route like in Next.js
-            guard let url = URL(string: "https://thodea.com/api/deleteImageGCS") else { return }
-
-            // GCS API Request
-            let payload: [String: Any] = [
-                "query": ["username": username]
-            ]
-
-            let bodyData = try JSONSerialization.data(withJSONObject: payload)
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = bodyData
-
-            // Firestore reference
-            let db = Firestore.firestore()
-            let userRef = db.collection("user").document(username)
-
-            do {
-                // Run GCS deletion + Firestore field removals concurrently
-                try await withThrowingTaskGroup(of: Void.self) { group in
-                    group.addTask {
-                        _ = try await URLSession.shared.data(for: request)
-                    }
-                    group.addTask {
-                        try await userRef.updateData([
-                            "profileUrl": FieldValue.delete(),
-                            "profileMiniUrl": FieldValue.delete()
-                        ])
-                    }
-                    try await group.waitForAll()
-                }
-
-                // 🧹 Local state cleanup
-                await MainActor.run {
-                    if !skipLocalCleanup {
-                        self.profileImageData = nil
-                    }
-                    self.profileImageExtension = nil
-                }
-
-            } catch {
-                print("🚫 Error removing profile image: \(error)")
-                throw error
-            }
+        guard let user = Auth.auth().currentUser, let username = currentUser?.username else { return }
+        // 🛡️ Get the Firebase ID Token (refreshes if expired)
+        let token = try await user.getIDToken()
+        
+        // 1. Update this to your actual Railway/Next.js URL
+        guard let url = URL(string: "https://www.thodea.com/api/deleteImageBunny") else {
+            print("🚫 Invalid URL")
+            return
         }
+
+        // 2. Match the payload to your Next.js API: { "query": { "username": "..." } }
+        let payload: [String: Any] = [
+            "query": [
+                "username": username,
+                "email": user.email
+                // "message": nil // Only include if deleting specific message media
+            ]
+        ]
+
+        let bodyData = try JSONSerialization.data(withJSONObject: payload)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = bodyData
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = bodyData
     
+        // Firestore reference
+        let db = Firestore.firestore()
+        let userRef = db.collection("user").document(username)
+
+        do {
+            // Run GCS deletion + Firestore field removals concurrently
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    
+                    if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                        // Log the error body from Next.js if available
+                        let errorLog = String(data: data, encoding: .utf8) ?? "Unknown Error"
+                        print("⚠️ Bunny API Error: \(errorLog)")
+                        throw URLError(.badServerResponse)
+                    }
+                }
+                group.addTask {
+                    try await userRef.updateData([
+                        "profileUrl": FieldValue.delete(),
+                        "profileMiniUrl": FieldValue.delete()
+                    ])
+                }
+                try await group.waitForAll()
+            }
+
+            // 🧹 Local state cleanup
+            await MainActor.run {
+                if !skipLocalCleanup {
+                    self.profileImageData = nil
+                }
+                self.profileImageExtension = nil
+            }
+
+        } catch {
+            print("🚫 Error removing profile image: \(error)")
+            throw error
+        }
+    }
+
     @MainActor
     func fetchUser() async {
         self.isLoadingUser = true
