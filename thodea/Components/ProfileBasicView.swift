@@ -10,6 +10,7 @@ import PhotosUI
 import Firebase // Ensure you have Firebase imports for the fetch logic
 import FirebaseDatabase
 import FirebaseFirestore
+import OSLog
 
 struct ProfileBasicView: View {
     let username: String
@@ -29,7 +30,9 @@ struct ProfileBasicView: View {
     @State private var selectedPickerItem: PhotosPickerItem? = nil
     @State private var profileImageData: Data? = nil
     @State private var isPreviewOpen = false
-    let uploadService = UploadService(signedPostEndpoint: URL(string: "https://thodea.com/api/uploadURL")!)
+    //let uploadService = UploadService(signedPostEndpoint: URL(string: "https://www.thodea.com/api/uploadURL")!)
+    
+    @StateObject private var bunnyService = BunnyUploadService() // <--- Add this line
     
     @State private var isLoading: Bool = true
     // 1. Check if we are looking at our own profile
@@ -362,38 +365,52 @@ struct ProfileBasicView: View {
             // 5. HANDLE DATA LOADING WHEN SELECTION CHANGES
             .onChange(of: selectedPickerItem) { newItem in
                 Task {
-                    guard let item = newItem else { return }
+                    guard let item = newItem else {
+                        Logger.media.warning("Picker dismissed without selection.")
+                        return
+                    }
+                    
+                    Logger.media.info("🏁 Starting image replacement process...")
                     
                     await MainActor.run {
-                        //isImageMenuOpen = true
                         authViewModel.isUploading = true
                     }
                     
                     do {
-                        // 🧹 If user already has an uploaded image → remove it first
+                        // 1. Cleanup old image
                         if viewModel.profileImageData != nil {
+                            Logger.media.debug("Existing profile data found. Initiating removal.")
                             try await viewModel.removeProfileImage(skipLocalCleanup: true)
+                            Logger.media.info("Successfully removed old profile image from storage.")
                         }
                         
-                        // Load new image data
-                        guard let data = try? await item.loadTransferable(type: Data.self) else {
+                        // 2. Load and validate data
+                        Logger.media.debug("Loading transferable data from picker...")
+                        // Pro Tip: Avoid 'try?' so we can catch the specific loading error
+                        let data = try await item.loadTransferable(type: Data.self)
+                        
+                        guard let data = data else {
+                            Logger.media.error("Failed to extract Data from PhotosPickerItem.")
                             await MainActor.run { authViewModel.isUploading = false }
                             return
                         }
                         
                         let ext = await item.fileExtension() ?? "jpg"
+                        
                         await MainActor.run {
                             viewModel.profileImageData = data
                             viewModel.profileImageExtension = ext
+                            Logger.media.info("Local state updated: Data loaded (\(data.count) bytes), extension: \(ext)")
                         }
                         
-                        print("Loaded: \(ext)")
-                        
-                        // 🚀 Continue to upload new image
+                        // 3. Hand off to upload
+                        Logger.media.info("🚀 Passing control to performImageUploadAndFinish()")
                         performImageUploadAndFinish()
                         
                     } catch {
-                        print("Error replacing image: \(error)")
+                        // Logs the full error details to the system console
+                        Logger.media.fault("❌ Image Replacement Failed: \(error.localizedDescription, privacy: .public)")
+                        
                         await MainActor.run {
                             authViewModel.isUploading = false
                             isImageMenuOpen = false
@@ -620,43 +637,54 @@ struct ProfileBasicView: View {
     }
     
     func performImageUploadAndFinish() {
-        guard let data = viewModel.profileImageData,
+        // 1. Ensure we have the raw data and user context
+        guard let rawData = viewModel.profileImageData,
               let username = viewModel.currentUser?.username else {
-            // handle missing data
             return
         }
 
         Task {
-            await MainActor.run { authViewModel.isUploading = true }
             do {
-                // Use original file name if you have; fallback to "photo.jpg"
-                let ext = viewModel.profileImageExtension ?? "jpg"
-                let originalFilename = "photo.\(ext)"
-                let ok = try await uploadService.uploadImageData(data, originalFilename: originalFilename, username: username)
-                if ok {
-                    // Build final public URL that matches your bucket path
-                    let timestamp = Int(Date().timeIntervalSince1970 * 1000)
-                    let remoteFilename = "https://storage.googleapis.com/thodea_assets/user/\(username)/asset\(timestamp).\(ext)" // match your canonical url pattern
-                    // Option A: update Firestore directly
-                    try await updateProfileUrlInFirestore(username: username, url: remoteFilename)
+                // 2. Start UI Loading State
+                await MainActor.run { authViewModel.isUploading = true }
 
-                    // Update UI state on main thread
-                    await MainActor.run {
-                        viewModel.profileImageData = data
-                        authViewModel.isUploading = false
-                        isImageMenuOpen = false
-                        // set local view-model fields describing loaded:true etc.
-                    }
-                } else {
+                // 3. JPEG COMPRESSION STEP
+                // Convert Data -> UIImage -> Compressed JPEG Data
+                guard let uiImage = UIImage(data: rawData),
+                      let compressedData = uiImage.jpegData(compressionQuality: 0.80) else {
+                    throw UploadError.compressionFailed
+                }
+
+                // 4. Define metadata
+                let ext = "jpg" // Since we forced JPEG compression, extension is now jpg
+                
+                // 5. Upload to Bunny
+                // The service now handles the signing and the PUT request
+                let finalCdnUrl = try await bunnyService.uploadImage(
+                    data: compressedData,
+                    username: username,
+                    fileExtension: ext
+                )
+
+                // Check if we got a URL back (since the function returns String?)
+                guard let urlToSave = finalCdnUrl else {
                     throw UploadError.uploadFailed
                 }
-            } catch {
+
+                try await updateProfileUrlInFirestore(username: username, url: urlToSave)
+                
+                // 7. Success Cleanup
                 await MainActor.run {
+                    // Keep the compressed data in memory for the local UI to save RAM
+                    viewModel.profileImageData = compressedData
                     authViewModel.isUploading = false
                     isImageMenuOpen = false
                 }
-                // show an alert
-                print("Upload failed: \(error)")
+                
+            } catch {
+                await MainActor.run { authViewModel.isUploading = false }
+                print("Upload failed: \(error.localizedDescription)")
+                // Trigger your error alert here
             }
         }
     }

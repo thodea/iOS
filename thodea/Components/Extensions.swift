@@ -11,6 +11,8 @@ import FirebaseFirestore
 import UniformTypeIdentifiers
 import PhotosUI
 import _PhotosUI_SwiftUI
+import OSLog
+
 
 extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
     override open func viewDidLoad() {
@@ -88,6 +90,7 @@ enum UploadError: Error {
     case backendError(String)
     case uploadFailed
     case invalidResponse
+    case compressionFailed
 }
 
 final class UploadService {
@@ -219,7 +222,12 @@ final class UploadService {
 
 func updateProfileUrlInFirestore(username: String, url: String) async throws {
     let db = Firestore.firestore()
-    try await db.collection("user").document(username).updateData(["profileUrl": url])
+    let miniUrl = "\(url)?width=100&height=100&mode=crop"
+    let userRef = db.collection("user").document(username)
+    try await userRef.updateData([
+        "profileUrl": url,
+        "profileMiniUrl": miniUrl,
+    ])
 }
 
 extension PhotosPickerItem {
@@ -240,3 +248,13 @@ extension Notification.Name {
 }
 
 
+
+extension Logger {
+    private static var subsystem = Bundle.main.bundleIdentifier ?? "com.thodea.app"
+    
+    // This must be 'media' to match your code call: Logger.media.info(...)
+    static let media = Logger(subsystem: subsystem, category: "MediaUpload")
+    
+    // You can keep uploads as a separate category if you like
+    static let uploads = Logger(subsystem: subsystem, category: "Uploads")
+}

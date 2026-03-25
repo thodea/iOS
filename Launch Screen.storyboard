@@ -16,17 +16,17 @@
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="thodea" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="36" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
-                                <rect key="frame" x="145.33333333333334" y="273" width="102.33333333333334" height="43"/>
-                                <fontDescription key="fontDescription" type="system" weight="ultraLight" pointSize="36"/>
-                                <color key="textColor" red="0.88413571575902894" green="0.88058683055893572" blue="0.94257701526988635" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
+                            <label opaque="NO" clipsSubviews="YES" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" misplaced="YES" text="thodea" textAlignment="center" lineBreakMode="middleTruncation" baselineAdjustment="alignBaselines" minimumFontSize="36" translatesAutoresizingMaskIntoConstraints="NO" id="GJd-Yh-RWb">
+                                <rect key="frame" x="134" y="305" width="124" height="41"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="36"/>
+                                <color key="textColor" red="0.24136283989999999" green="0.50275897979999995" blue="0.96475070709999999" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                                 <nil key="highlightedColor"/>
                             </label>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="logo" translatesAutoresizingMaskIntoConstraints="NO" id="YxL-el-iup">
-                                <rect key="frame" x="154.66666666666666" y="139" width="84" height="84"/>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" misplaced="YES" image="universe" translatesAutoresizingMaskIntoConstraints="NO" id="YxL-el-iup">
+                                <rect key="frame" x="126" y="140" width="140" height="130"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" constant="84" id="CbR-zZ-nCa" userLabel="width = 100"/>
-                                    <constraint firstAttribute="height" constant="84" id="jYE-VS-yt4"/>
+                                    <constraint firstAttribute="width" constant="155" id="CbR-zZ-nCa" userLabel="width = 100"/>
+                                    <constraint firstAttribute="height" constant="97" id="jYE-VS-yt4"/>
                                 </constraints>
                             </imageView>
                         </subviews>
@@ -46,6 +46,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="logo" width="64" height="64"/>
+        <image name="universe" width="682.66668701171875" height="682.66668701171875"/>
     </resources>
 </document>

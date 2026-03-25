@@ -1,4 +1,6 @@
 import SwiftUI
+import Foundation
+import UIKit
 
 struct ImageView: View {
     let imageURL: String
@@ -61,5 +63,23 @@ struct ImageView: View {
             }
             isLoading = false
         }
+    }
+}
+
+func uploadToRailway(image: UIImage, username: String) async throws {
+    guard let data = image.jpegData(compressionQuality: 0.7) else { return }
+    
+    let url = URL(string: "https://your-thodea-app.railway.app/api/upload/ios")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    
+    // Pass the username in headers or as a query param
+    request.setValue(username, forHTTPHeaderField: "X-Username")
+    request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+
+    let (_, response) = try await URLSession.shared.upload(for: request, from: data)
+    
+    if (response as? HTTPURLResponse)?.statusCode == 200 {
+        print("Done!")
     }
 }
