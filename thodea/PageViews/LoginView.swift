@@ -35,15 +35,15 @@ struct LoginView: View {
                         if !emailSent {
                             VStack {
                                 HStack(spacing: 20) {
-                                    SocialLoginButton(imageName: "https://cdn.nikpevnev.com/assets/store/design/google.webp") {
+                                    SocialLoginButton(imageName: "google") {
                                         signIn(provider: "google")
                                     }
                                     Spacer()
-                                    SocialLoginButton(imageName: "https://cdn.nikpevnev.com/assets/store/design/microsoft.webp") {
+                                    SocialLoginButton(imageName: "microsoft") {
                                         signIn(provider: "microsoft")
                                     }
                                     Spacer()
-                                    SocialLoginButton(imageName: "https://cdn.nikpevnev.com/assets/store/design/yahoo.webp") {
+                                    SocialLoginButton(imageName: "yahoo") {
                                         signIn(provider: "yahoo")
                                     }
                                 }.frame(maxWidth: .infinity, minHeight: 75)
@@ -253,7 +253,10 @@ struct SocialLoginButton: View {
     
     var body: some View {
         Button(action: action) {
-            ImageView(imageURL: imageName, size: 40);
+            Image(imageName) // This looks in Assets.xcassets
+                .resizable()
+                .scaledToFit()
+                .frame(width: 40, height: 40) // Standard touch target size
         }
     }
 }

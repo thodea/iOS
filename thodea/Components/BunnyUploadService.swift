@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import FirebaseAuth
 // 1. Change to ObservableObject
 
 class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
@@ -18,6 +19,14 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
     private let signingEndpoint = "https://www.thodea.com/api/upload/sign"
 
     func uploadImage(data: Data, username: String, fileExtension: String) async throws -> String? {
+        // 1. Get current user context
+        guard let user = Auth.auth().currentUser, let email = user.email else {
+            throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        // 2. Fetch fresh Firebase Token
+        let token = try await user.getIDToken()
+    
         // 1. Construct the path here (Logic moved from View to Service)
         let timestamp = Int(Date().timeIntervalSince1970 * 1000)
         let generatedPath = "user/\(username)/asset\(timestamp).\(fileExtension)"
@@ -32,7 +41,8 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
         var signRequest = URLRequest(url: signURL)
         signRequest.httpMethod = "POST"
         signRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        signRequest.httpBody = try? JSONSerialization.data(withJSONObject: ["path": generatedPath])
+        signRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        signRequest.httpBody = try? JSONSerialization.data(withJSONObject: ["path": generatedPath, "email": email])
 
         let (authData, _) = try await URLSession.shared.data(for: signRequest)
         let authResponse = try JSONDecoder().decode(BunnyAuthResponse.self, from: authData)
