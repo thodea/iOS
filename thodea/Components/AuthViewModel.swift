@@ -13,6 +13,7 @@ import FirebaseCore
 import FirebaseFirestore
 import FirebaseDatabase // 👈 Add Realtime Database import
 import SwiftUI
+import OSLog
 
 class AuthViewModel: ObservableObject {
     @Published var userSession: FirebaseAuth.User?
@@ -317,8 +318,12 @@ class AuthViewModel: ObservableObject {
     
     func signOut() {
         do {
+            // NEED to make nil all items as they are cached... like all of user variables
             try Auth.auth().signOut()
             self.userSession = nil
+            self.profileImageData = nil
+            self.profileImageExtension = nil
+            self.profileMiniImageData = nil
             self.currentUser = nil
             self.userExistsInFirestore = nil
             self.layerOneLoaded = false

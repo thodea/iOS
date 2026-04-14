@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 import Firebase // Ensure you have Firebase imports for the fetch logic
+import FirebaseAuth
 import FirebaseDatabase
 import FirebaseFirestore
 import OSLog
