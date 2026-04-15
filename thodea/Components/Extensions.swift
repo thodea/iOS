@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 import PhotosUI
 import _PhotosUI_SwiftUI
 import OSLog
+import SwiftUI
 
 
 extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
@@ -257,4 +258,17 @@ extension Logger {
     
     // You can keep uploads as a separate category if you like
     static let uploads = Logger(subsystem: subsystem, category: "Uploads")
+}
+
+
+extension View {
+    func addTabHaptic<T: Equatable>(trigger: T) -> some View {
+        if #available(iOS 17.0, *) {
+            return self.sensoryFeedback(.selection, trigger: trigger)
+        } else {
+            // For iOS 16 and below, we don't apply the modifier
+            // as it doesn't exist.
+            return self
+        }
+    }
 }

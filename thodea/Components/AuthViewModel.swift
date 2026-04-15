@@ -50,6 +50,14 @@ class AuthViewModel: ObservableObject {
         }
     }
     
+    func primeCache(with data: Data, for urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        let request = URLRequest(url: url)
+        let response = URLResponse(url: url, mimeType: "image/jpeg", expectedContentLength: data.count, textEncodingName: nil)
+        let cachedResponse = CachedURLResponse(response: response, data: data)
+        URLCache.shared.storeCachedResponse(cachedResponse, for: request)
+    }
+    
     func singIn(withEmail email: String, link: String) async throws {
         if Auth.auth().isSignIn(withEmailLink: link) {
             Auth.auth().signIn(withEmail: email, link: link) { authResult, error in
