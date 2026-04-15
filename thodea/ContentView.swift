@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var bunnyService = BunnyUploadService() // ✅ ADD THIS LINE HERE
     @State private var selectedNavItem: String = "login"
     
     var body: some View {
@@ -73,10 +74,13 @@ struct ContentView: View {
                 // on your AuthViewModel. If not, adjust the binding.
                 GlobalOverlayView(
                     isUploading: $authViewModel.isUploading,
-                    isDeleting: $authViewModel.isDeleting
+                    isDeleting: $authViewModel.isDeleting,
+                    progress: bunnyService.progress
                 )
             }
-        }.environmentObject(authViewModel)
+        }
+        .environmentObject(authViewModel)
+        .environmentObject(bunnyService) // <--- Add this here
     }
 }
 

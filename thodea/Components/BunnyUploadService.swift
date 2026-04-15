@@ -55,7 +55,11 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
             cdnUrl: authResponse.cdnUrl
         )
         
-        await MainActor.run { self.isUploading = false }
+        await MainActor.run {
+            self.progress = 1.0
+            self.isUploading = false
+        }
+        
         return finalUrl
     }
 
@@ -87,15 +91,23 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
         }
     }
 
-    // Progress Tracking
+
+    
+    // Inside BunnyUploadService
     func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
         let calculatedProgress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
-        
-        // Ensure UI updates happen on the Main Thread
+                
+        // UI updates must be on MainActor for SwiftUI to pick up the @Published change immediately
         DispatchQueue.main.async {
-            self.progress = calculatedProgress
+            // Clamp progress to 0.99 during upload to allow "Finalizing..."
+            // to show until the async function actually returns.
+            self.progress = min(calculatedProgress, 0.99)
         }
+    
     }
+    
+    
+    
 }
 
 

@@ -71,6 +71,7 @@ struct Footer: View {
         .shadow(radius: 5)
         .padding(.bottom, 26)
         .padding(.horizontal, 16)
+        .addTabHaptic(trigger: selectedNavItem)
         //.border(Color.green, width: 2)
     }
 }

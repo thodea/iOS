@@ -158,35 +158,54 @@ let mockThought = Thought(
     profileDeleted: nil // No profileDeleted info provided
 )
 
+
 struct GlobalOverlayView: View {
     @Binding var isUploading: Bool
     @Binding var isDeleting: Bool
+    var progress: Double = 0.0 // New: Pass progress here
     
     var body: some View {
-        if isUploading {
+        if isUploading || isDeleting {
             ZStack {
-                // Background dimmer - covers the whole screen including safe areas
                 Color(red: 17/255, green: 24/255, blue: 39/255)
                     .ignoresSafeArea()
                     .opacity(0.8)
 
-                // Alert box content
-                HStack(spacing: 12) { // 👈 Changed from VStack to HStack for one row
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        // Use a light color for visibility against the dark background
-                        .tint(.white)
-
-                    Text(isDeleting ? "Deleting" : "Uploading")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                VStack(spacing: 16) {
+                    if isUploading {
+                        // Next.js style Text logic
+                        Text(progress < 1.0 ? "Uploading: \(Int(progress * 100))%" : "Finalizing...")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.blue) // Matches text-sky-500
+                        
+                        // Progress Bar Container
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.gray.opacity(0.3))
+                                .frame(width: 150, height: 8)
+                            
+                            Capsule()
+                                .fill(Color.blue)
+                                .frame(width: 150 * CGFloat(progress), height: 8)
+                                .animation(.easeOut(duration: 0.3), value: progress)
+                        }
+                    } else {
+                        // Deleting State
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                            // Use a light color for visibility against the dark background
+                                .tint(.white)
+                            
+                            Text("Deleting").font(.headline).foregroundColor(.white)
+                        }
+                    }
                 }
                 .padding()
-                .cornerRadius(14)
-                .shadow(radius: 12)
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.3), radius: 20)
             }
             .transition(.opacity)
-            .animation(.easeInOut(duration: 0.15), value: isUploading)
         }
     }
 }

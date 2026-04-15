@@ -21,7 +21,6 @@ struct ProfileBasicView: View {
     @State private var selectedTab: String = "thoughts"
     @State private var bioInfo: Bool = true
     @EnvironmentObject var viewModel: AuthViewModel
-    @EnvironmentObject var authViewModel: AuthViewModel // Add this
     @Environment(\.presentationMode) var presentationMode
     @State private var webViewData: WebViewData?
     @State private var isImageMenuOpen = false
@@ -33,7 +32,7 @@ struct ProfileBasicView: View {
     @State private var isPreviewOpen = false
     //let uploadService = UploadService(signedPostEndpoint: URL(string: "https://www.thodea.com/api/uploadURL")!)
     
-    @StateObject private var bunnyService = BunnyUploadService() // <--- Add this line
+    @EnvironmentObject var bunnyService: BunnyUploadService // <--- Use the shared instance
     
     @State private var isLoading: Bool = true
     // 1. Check if we are looking at our own profile
@@ -171,6 +170,16 @@ struct ProfileBasicView: View {
                             .fill(Color(red: 17/255, green: 24/255, blue: 39/255))
                             .frame(width: 100, height: 100)
                             .shadow(color: Color.black.opacity(0.6), radius: 4, x: 0, y: 2)
+                            
+                        if let urlStr = isCurrentUser ? viewModel.currentUser?.profileUrl : fetchedUser?.profileUrl,
+                               let url = URL(string: urlStr) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: {
+                                    Color.clear
+                                }
+                                .frame(width: 100, height: 100)
+                            }
                         
                         // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
                         if let data = displayImageData, let uiImage = UIImage(data: data) {
@@ -374,7 +383,7 @@ struct ProfileBasicView: View {
                     Logger.media.info("🏁 Starting image replacement process...")
                     
                     await MainActor.run {
-                        authViewModel.isUploading = true
+                        viewModel.isUploading = true
                     }
                     
                     do {
@@ -392,7 +401,7 @@ struct ProfileBasicView: View {
                         
                         guard let data = data else {
                             Logger.media.error("Failed to extract Data from PhotosPickerItem.")
-                            await MainActor.run { authViewModel.isUploading = false }
+                            await MainActor.run { viewModel.isUploading = false }
                             return
                         }
                         
@@ -413,7 +422,7 @@ struct ProfileBasicView: View {
                         Logger.media.fault("❌ Image Replacement Failed: \(error.localizedDescription, privacy: .public)")
                         
                         await MainActor.run {
-                            authViewModel.isUploading = false
+                            viewModel.isUploading = false
                             isImageMenuOpen = false
                         }
                     }
@@ -426,7 +435,7 @@ struct ProfileBasicView: View {
                     Color(red: 17/255, green: 24/255, blue: 39/255)
                         .ignoresSafeArea()
                         .onTapGesture {
-                            if !authViewModel.isUploading {
+                            if !viewModel.isUploading {
                                 isImageMenuOpen = false
                             }
                         }
@@ -450,19 +459,19 @@ struct ProfileBasicView: View {
                             Task {
                                 do {
                                     isImageMenuOpen = false
-                                    await MainActor.run {authViewModel.isDeleting = true; authViewModel.isUploading = true }
+                                    await MainActor.run {viewModel.isDeleting = true }
                                     selectedPickerItem = nil
-                                    try await authViewModel.removeProfileImage()
+                                    try await viewModel.removeProfileImage()
                                     
                                     await MainActor.run {
-                                        authViewModel.isDeleting = false
-                                        authViewModel.isUploading = false
+                                        viewModel.isDeleting = false
+                                        viewModel.isUploading = false
                                         isImageMenuOpen = false
                                     }
                                 } catch {
                                     await MainActor.run {
-                                        authViewModel.isDeleting = false
-                                        authViewModel.isUploading = false
+                                        viewModel.isDeleting = false
+                                        viewModel.isUploading = false
                                         isImageMenuOpen = false
                                     }
                                     print("Delete failed: \(error)")
@@ -647,7 +656,7 @@ struct ProfileBasicView: View {
         Task {
             do {
                 // 2. Start UI Loading State
-                await MainActor.run { authViewModel.isUploading = true }
+                await MainActor.run { viewModel.isUploading = true }
 
                 // 3. JPEG COMPRESSION STEP
                 // Convert Data -> UIImage -> Compressed JPEG Data
@@ -671,21 +680,28 @@ struct ProfileBasicView: View {
                 guard let urlToSave = finalCdnUrl else {
                     throw UploadError.uploadFailed
                 }
+                
+                viewModel.primeCache(with: compressedData, for: urlToSave)
 
                 try await updateProfileUrlInFirestore(username: username, url: urlToSave)
-                
+                                    
                 // 7. Success Cleanup
                 await MainActor.run {
                     // Keep the compressed data in memory for the local UI to save RAM
                     viewModel.profileImageData = compressedData
-                    authViewModel.isUploading = false
+                    viewModel.isUploading = false
                     isImageMenuOpen = false
+                    bunnyService.progress = 0.0
+                    bunnyService.isUploading = false
                 }
                 
             } catch {
-                await MainActor.run { authViewModel.isUploading = false }
-                print("Upload failed: \(error.localizedDescription)")
-                // Trigger your error alert here
+                await MainActor.run {
+                    viewModel.isUploading = false
+                    bunnyService.progress = 0.0
+                    bunnyService.isUploading = false}
+                    print("Upload failed: \(error.localizedDescription)")
+                    // Trigger your error alert here
             }
         }
     }
