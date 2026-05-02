@@ -179,6 +179,8 @@ struct ProfileBasicView: View {
                                     Color.clear
                                 }
                                 .frame(width: 100, height: 100)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                         
                         // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
