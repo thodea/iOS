@@ -8,6 +8,7 @@
 import Foundation
 import AVKit
 import SwiftUI
+import FirebaseFirestore
 
 struct Thought: Identifiable {
     let id = UUID() // Optional unique identifier for SwiftUI's List or ForEach
@@ -111,6 +112,32 @@ struct User {
             self.deleted = deleted
         }
         
+}
+
+struct Chat: Identifiable, Codable {
+    @DocumentID var id: String?
+    
+    // Core structure
+    let chatUsers: [String]
+    let startedAt: Date
+    
+    // Optional during the "Empty" or "Pending" phase
+    var acceptedBy: [String]?
+    var allAccepted: Bool?
+    var lastMessage: String?
+    var lastMessagedAt: Date?
+    var lastMessagedBy: String?
+    var newMessageFrom: String?
+    var startedBy: String?
+    var empty: Bool?
+    
+    // UI Local state
+    var imageURL: String?
+
+    // Logic to find the other person
+    func otherUser(currentUsername: String) -> String {
+        chatUsers.first(where: { $0 != currentUsername }) ?? "~unknown"
+    }
 }
 
 

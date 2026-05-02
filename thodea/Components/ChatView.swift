@@ -9,12 +9,54 @@ import SwiftUI
 import SafariServices
 
 struct ChatView: View {
-    let chat: Thought
+    let chat: Chat
     @State private var isHeartTapped = false
     @State private var heartScale: CGFloat = 1.0
     @State private var heartColor: Color = Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255)
     @State private var showSafariView = false
     @State private var urlToOpen: URL?
+    @EnvironmentObject var authViewModel: AuthViewModel // Add this
+    
+    var username: String {
+        authViewModel.currentUser?.username ?? ""
+    }
+    
+    // Add this inside ChatView
+    private var isIncomingMessage: Bool {
+        username != chat.lastMessagedBy
+    }
+
+    // Custom Blue Colors
+    private let brandBlue = Color(red: 37/255, green: 99/255, blue: 235/255)
+    private let shadowBlue = Color(red: 30/255, green: 64/255, blue: 175/255)
+    
+    
+    
+    private var placeholderView: some View {
+        ZStack {
+            // 1. The solid background that "catches" the shadow
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color(red: 17/255, green: 24/255, blue: 39/255)) // Or .white
+            
+            // 2. The border/stroke (Optional, but adds definition)
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.black.opacity(0.2), lineWidth: 1)
+            
+            // 3. The Icon
+            Image(systemName: "person.fill")
+                .resizable()
+                .scaledToFit()
+                .padding(8)
+                .foregroundColor(.gray)
+        }
+        .frame(width: 34, height: 34)
+        // 4. Modern Shadow Styling
+        .shadow(color: isIncomingMessage ? shadowBlue.opacity(0.8) : .black.opacity(0.3),
+                    radius: isIncomingMessage ? 4 : 1,
+                    x: 1, y: 2)
+        //.shadow(color: .black.opacity(0.3), radius: 1, x: 1, y: 2)
+    }
+
     
     func findURLs(in text: String) -> [String] {
        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
@@ -48,7 +90,7 @@ struct ChatView: View {
     }
     
     var timeAgo: String {
-         if let createdAt = chat.createdAt {
+         if let createdAt = chat.lastMessagedAt {
              let timeElapsed = Int(Date().timeIntervalSince(createdAt))
              if timeElapsed < 60 {
                  return "\(timeElapsed) seconds ago"
@@ -66,32 +108,61 @@ struct ChatView: View {
          return "Unknown time"
      }
     
+    private var messageStyle: (text: String, color: Color, opacity: Double, isItalic: Bool, icon: String?) {
+        let softRed = Color(red: 252/255, green: 165/255, blue: 165/255)
+        
+        guard let msg = chat.lastMessage else {
+            return ("deleted message", softRed, 0.25, true, nil) // Added icon name
+        }
+        
+        if msg.isEmpty {
+            return ("media", .white, 0.5, false, "photo.artframe") // Added icon name
+        }
+        
+        return (msg, .white, 1.0, false, nil) // No icon for regular text
+    }
+    
     var body: some View {
         //Color.green.edgesIgnoringSafeArea(.all)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(){
-                if let imageURL = mockThought.imageURL {
-                    ImageView(imageURL: imageURL, size: 35).padding(.trailing, 4);
-                    /*AsyncImage(url: URL(string: imageURL), transaction: Transaction(animation: .easeInOut)) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 20, height: 20)
-                                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .frame(width: 40, height: 40)
-                                    .foregroundColor(.gray)
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }*/
+                if let urlString = chat.imageURL, let url = URL(string: urlString) {
+                    // Scenario 1: URL exists, attempt to load
+                    AsyncImage(url: url, transaction: Transaction(animation: .easeInOut)) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 34, height: 34)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(isIncomingMessage ? brandBlue : Color.clear, lineWidth: 0.5)
+                                )
+                                .shadow(color: isIncomingMessage ? shadowBlue.opacity(0.8) : .black.opacity(0.5),
+                                        radius: 3, x: 2, y: 1)
+                            
+                        case .failure(_):
+                            // Scenario 2: URL exists but loading failed
+                            placeholderView
+                            
+                        case .empty:
+                            // Loading state
+                            ProgressView()
+                                .frame(width: 34, height: 34)
+                            
+                        @unknown default:
+                            placeholderView
+                        }
+                    }
+                    .padding(.trailing, 4)
+                } else {
+                    // Scenario 3: imageURL is nil or invalid string
+                    placeholderView
+                        .padding(.trailing, 4)
                 }
-                Text("\(chat.createdBy)")
+                Text("\(chat.otherUser(currentUsername: username))")
                     .font(.system(size: 20))
                     .fontWeight(.semibold)
                     .foregroundColor(.gray)
@@ -108,7 +179,7 @@ struct ChatView: View {
                 
                     Spacer()
 
-                    if chat.createdAt != nil {
+                    if chat.lastMessagedAt != nil {
                         Text("\(timeAgo)")
                             .italic()
                     }
@@ -122,14 +193,28 @@ struct ChatView: View {
             .padding(.horizontal, 8)
             .padding(.top, 10)
             //.border(.red, width: 2)
-
-            Text(highlightText(chat.message))
-                .font(.system(size: 20))
+            let style = messageStyle
+            
+                HStack(spacing: 6) { // This puts them on the same line
+                    if let iconName = style.icon {
+                        Image(systemName: iconName)
+                            .font(.system(size: 16)) // Scales with text
+                            .foregroundColor(.blue)
+                            .offset(y: 1)
+                            .opacity(style.opacity)
+                    }
+                    
+                    Text(highlightText(style.text))
+                        .font(.system(size: 20))
+                        .italic(style.isItalic)
+                        .foregroundColor(style.color) // Apply dynamic color
+                        .opacity(style.opacity)
+                        .lineLimit(1) // Limit to 2 lines
+                        .truncationMode(.tail)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
-                .lineLimit(1) // Limit to 2 lines
-                .truncationMode(.tail)
                 .environment(\.openURL, OpenURLAction { url in
                     // Custom action before opening URL
                     //print("Navigating to \(url)")
@@ -154,7 +239,8 @@ struct ChatView: View {
                     }
                     
                 }
-                .padding(.bottom, 4)
+                .padding(.top, 5)
+                .padding(.bottom, 8)
                        
                 /*.fullScreenCover(isPresented: $showSafariView) {
                     if urlToOpen != nil {
