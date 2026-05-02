@@ -14,7 +14,8 @@ struct FeedView: View {
     /*init() {
 
      }*/
-
+    //private let chatService = ChatService()
+    
     var body: some View {
         ScrollView { // Wrap the content in a ScrollView
             
@@ -23,7 +24,7 @@ struct FeedView: View {
                 VStack {
                     Text("")
                 }.frame(maxHeight:1)
-                
+                //.task { await chatService.createThreeSampleConversations(currentUserId: "test")}
                 VStack {
                     Text("follow to customize feed")
                         .font(.headline) // Adjust font size and weight
@@ -150,3 +151,51 @@ struct mostFollowedLabel: View {
     }
 }
 
+
+
+// TESTING
+/*
+class ChatService {
+    private let db = Firestore.firestore()
+
+    func createThreeSampleConversations(currentUserId: String) async {
+        let batch = db.batch()
+        let collectionRef = db.collection("conversation")
+        
+        // Define your 3 different scenarios/users
+        let targets = ["test_user_1", "test_user_2", "test_user_3"]
+        
+        for target in targets {
+            let newChat = Chat(
+                chatUsers: [currentUserId, target],
+                startedAt: Date(),
+                acceptedBy: [currentUserId, target],
+                allAccepted: true,
+                lastMessage: "Initial message for \(target)",
+                lastMessagedAt: Date(),
+                lastMessagedBy: currentUserId,
+                newMessageFrom: currentUserId,
+                startedBy: target
+            )
+            
+            // 1. Create a reference with an auto-generated ID
+            let newDocRef = collectionRef.document()
+            
+            do {
+                // 2. Encode the chat object and add to batch
+                try batch.setData(from: newChat, forDocument: newDocRef)
+            } catch {
+                print("Encoding error: \(error)")
+                return
+            }
+        }
+        
+        // 3. Commit all 3 writes at once
+        do {
+            try await batch.commit()
+            print("Successfully created 3 conversations in one batch.")
+        } catch {
+            print("Batch commit failed: \(error.localizedDescription)")
+        }
+    }
+}*/
