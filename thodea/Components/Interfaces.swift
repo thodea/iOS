@@ -142,10 +142,15 @@ struct Chat: Identifiable, Codable {
 
 
 struct Message: Identifiable, Hashable {
-    let id = UUID()
-    let content: String
-    let user: User
-    let createdAt: Date
+    @DocumentID var id: String?
+    let message: String
+    let messagedBy: User
+    let messagedAt: Date
+    let loved: Bool
+    
+    let assetType: String?
+    let assetUrl: String?
+    
     
     // Add these optional properties
     var attachedImage: UIImage?
@@ -336,5 +341,35 @@ struct DateWithFormattedTimeView: View {
         } else {
             return seconds == 1 ? "\(seconds) second ago" : "\(seconds) seconds ago"
         }
+    }
+}
+
+
+struct ContinuousProgressView: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ZStack {
+            // 1. The background ring (Gray-200/Opacity 30 equivalent)
+            Circle()
+                .stroke(lineWidth: 4)
+                .opacity(0.3)
+                .foregroundColor(Color(uiColor: .systemGray4))
+            
+            // 2. The spinning "indicator" (The fill-slate-300 / blue path)
+            Circle()
+                .trim(from: 0, to: 0.25) // This creates the short "arc"
+                .stroke(style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .foregroundColor(.blue.opacity(0.3)) // You can change this to match your tint
+                .rotationEffect(Angle(degrees: isAnimating ? 360 : 0))
+                .onAppear {
+                    withAnimation(Animation.linear(duration: 1).repeatForever(autoreverses: false)) {
+                        isAnimating = true
+                    }
+                }
+        }
+        .frame(width: 28, height: 28) // Equivalent to w-8 h-8
+        .padding(.top, 8) // Equivalent to mt-2
+        .padding(.bottom, 8)
     }
 }

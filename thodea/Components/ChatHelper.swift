@@ -70,16 +70,20 @@ class ChatHelper: ObservableObject {
          }*/
         realTimeMessages = (1...10).map { i in
             Message(
-                content: "test.com google.com http://google.com www.thodea.com https://www.thodea.com message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
-                user: mockUsers[i % mockUsers.count], // Safely wraps around
-                createdAt: Date().addingTimeInterval(Double(-600 + (i * 60)))
+                id: String(i),
+                message: "test.com google.com http://google.com www.thodea.com https://www.thodea.com message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
+                messagedBy: mockUsers[i % mockUsers.count], // Safely wraps around
+                messagedAt: Date().addingTimeInterval(Double(-600 + (i * 60))),
+                loved: true,
+                assetType: "image/jpeg",
+                assetUrl: "https://thodea.b-cdn.net/conversation/PB5zK88beAalQSJcRPMk/messages/1x2c6yv8NT4dqoGRuDfL/asset.jpeg"
             )
         }
         
      }
 
     
-    func sendMessage(_ content: String, user: User, image: UIImage? = nil, videoURL: URL? = nil) {
+    func sendMessage(_ content: String, user: User, image: UIImage? = nil, videoURL: URL? = nil, id: String) {
         // Guard: ensure we have at least text OR media
         guard !content.trimmingCharacters(in: .whitespaces).isEmpty || image != nil || videoURL != nil else { return }
         
@@ -103,18 +107,23 @@ class ChatHelper: ObservableObject {
          */
         
         // Init message with the new optionals
+        // ✅ Fixed
         let newMessage = Message(
-            content: content,
-            user: user,
-            createdAt: Date(),
-            attachedImage: image,     // <--- Pass Image
-            attachedVideoURL: videoURL // <--- Pass Video
+            id: id,
+            message: content,
+            messagedBy: user,
+            messagedAt: Date(),
+            loved: false,
+            assetType: nil,
+            assetUrl: nil,
+            attachedImage: image,
+            attachedVideoURL: videoURL
         )
         
         realTimeMessages.append(newMessage)
     }
     
-    func deleteMessage(id: UUID) {
+    func deleteMessage(id: String?) {
         realTimeMessages.removeAll { $0.id == id }
     }
 }
