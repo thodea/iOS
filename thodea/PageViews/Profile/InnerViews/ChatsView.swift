@@ -47,16 +47,14 @@ struct ChatsView: View {
                     ForEach(chatsViewModel.chats) { chat in
                         let otherUser = chat.otherUser(currentUsername: username)
                         
-                        NavigationLink(destination: MessagesView(username: otherUser, miniImageData: nil)) {
+                        NavigationLink(destination: MessagesView( username: otherUser, miniImageData: nil, chat: chat)) {
                             ChatView(chat: chat)
                         }
                     }
                     
                     // 3. Optional: Pagination Loader
                     if chatsViewModel.isLoading {
-                        ProgressView()
-                            .tint(.blue)
-                            .padding()
+                        ContinuousProgressView()
                     } else if chatsViewModel.canLoadMore {
                         Color.clear
                             .onAppear {

@@ -16,6 +16,13 @@ struct MessagesView: View {
     
     let username: String
     let miniImageData: Data?
+    let chat: Chat?
+    
+    init(username: String, miniImageData: Data? = nil, chat: Chat? = nil) {
+        self.username = username
+        self.miniImageData = miniImageData
+        self.chat = chat
+    }
     
     var body: some View {
         VStack(spacing: 16) {

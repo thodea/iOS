@@ -96,12 +96,12 @@ struct UserChatView: View {
 
     private var messageList: some View {
         ForEach(chatHelper.realTimeMessages, id: \.id) { msg in
-            let isCurrentUser = viewModel.currentUser?.username == msg.user.username
+            let isCurrentUser = viewModel.currentUser?.username ?? "" == msg.messagedBy.username
             // Pass the new parameters here
             ContentMessageView(
-                contentMessage: msg.content,
+                contentMessage: msg.message,
                 isCurrentUser: isCurrentUser,
-                createdAt: msg.createdAt,
+                createdAt: msg.messagedAt,
                 onDelete: { chatHelper.deleteMessage(id: msg.id) },
                 attachedImage: msg.attachedImage,       // <--- INJECT
                 attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
@@ -300,7 +300,8 @@ struct UserChatView: View {
             typingMessage,
             user: user,
             image: selectedImage,
-            videoURL: selectedVideoURL
+            videoURL: selectedVideoURL,
+            id: UUID().uuidString
         )
         
         // Reset UI
