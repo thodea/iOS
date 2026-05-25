@@ -7,6 +7,7 @@
 
 
 import SwiftUI
+import Kingfisher
 
 struct MessagesView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -55,14 +56,20 @@ struct MessagesView: View {
                     NavigationLink(destination: ProfileUserView(username: username)) {
                         HStack(spacing: 8) {
                             Group {
-                                
-                                if let data = miniImageData, let uiImage = UIImage(data: data) {
-                                    // Show the selected photo
-                                    Image(uiImage: uiImage)
+                            
+                                if let urlString = chat?.imageURL, let url = URL(string: urlString) {
+                                    KFImage(url)
+                                        .placeholder {
+                                            // This placeholder will ONLY show if the image isn't in cache yet
+                                            ShimmerView()
+                                                .frame(width: 34, height: 34)
+                                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        }
                                         .resizable()
-                                        .scaledToFill() // Ensures photo fills the square
+                                        .fade(duration: 0.25) // Smooth transition on first fetch
+                                        .scaledToFill()
                                         .frame(width: 34, height: 34)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8)) // Clips the overflowing image
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                 } else {
                                     // STATE C: No URL exists at all -> Show Default Person Icon
                                     ZStack {

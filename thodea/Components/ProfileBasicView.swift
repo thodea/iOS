@@ -12,6 +12,8 @@ import FirebaseAuth
 import FirebaseDatabase
 import FirebaseFirestore
 import OSLog
+import Kingfisher
+
 
 struct ProfileBasicView: View {
     let username: String
@@ -173,10 +175,11 @@ struct ProfileBasicView: View {
                             
                         if let urlStr = isCurrentUser ? viewModel.currentUser?.profileUrl : fetchedUser?.profileUrl,
                                let url = URL(string: urlStr) {
-                                AsyncImage(url: url) { image in
-                                    image.resizable().scaledToFill()
-                                } placeholder: {
-                                    Color.clear
+                                KFImage(url)
+                                .placeholder {
+                                    ShimmerView()
+                                        .frame(width: 100, height: 100)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
                                 .frame(width: 100, height: 100)
                                 .clipped()
@@ -194,7 +197,9 @@ struct ProfileBasicView: View {
                         } else if hasProfileUrl {
                             // STATE B: URL exists (Loading) -> Show Transparent
                             // This prevents the "person.fill" from flashing while waiting for download
-                            Color.clear
+                            ShimmerView()
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             
                         } else {
                             // STATE C: No URL exists at all -> Show Default Person Icon

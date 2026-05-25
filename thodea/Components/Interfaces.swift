@@ -373,3 +373,33 @@ struct ContinuousProgressView: View {
         .padding(.bottom, 8)
     }
 }
+
+struct ShimmerView: View {
+    @State private var startPoint = UnitPoint(x: -1.5, y: -0.5)
+    @State private var endPoint = UnitPoint(x: 0.0, y: 0.5)
+    
+    // Translucent tones that look gorgeous on dark backgrounds
+    private let shimmerColors = [
+        Color.white.opacity(0.06),
+        Color.white.opacity(0.18),
+        Color.white.opacity(0.06)
+    ]
+    
+    var body: some View {
+        LinearGradient(
+            colors: shimmerColors,
+            startPoint: startPoint,
+            endPoint: endPoint
+        )
+        .onAppear {
+            withAnimation(
+                .linear(duration: 1.3)
+                .repeatForever(autoreverses: false)
+            ) {
+                // Shift the gradient across the boundaries to create the reflection sweep
+                startPoint = UnitPoint(x: 1.5, y: 0.5)
+                endPoint = UnitPoint(x: 3.0, y: 1.5)
+            }
+        }
+    }
+}
