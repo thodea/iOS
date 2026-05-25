@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SafariServices
+import Kingfisher
 
 struct ChatView: View {
     let chat: Chat
@@ -127,37 +128,25 @@ struct ChatView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(){
                 if let urlString = chat.imageURL, let url = URL(string: urlString) {
-                    // Scenario 1: URL exists, attempt to load
-                    AsyncImage(url: url, transaction: Transaction(animation: .easeInOut)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
+                    KFImage(url)
+                        .placeholder {
+                            // This placeholder will ONLY show if the image isn't in cache yet
+                            ShimmerView()
                                 .frame(width: 34, height: 34)
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(isIncomingMessage ? brandBlue : Color.clear, lineWidth: 0.5)
-                                )
-                                .shadow(color: isIncomingMessage ? shadowBlue.opacity(0.8) : .black.opacity(0.5),
-                                        radius: 3, x: 2, y: 1)
-                            
-                        case .failure(_):
-                            // Scenario 2: URL exists but loading failed
-                            placeholderView
-                            
-                        case .empty:
-                            // Loading state
-                            ProgressView()
-                                .frame(width: 34, height: 34)
-                            
-                        @unknown default:
-                            placeholderView
                         }
-                    }
-                    .padding(.trailing, 4)
-                } else {
+                        .resizable()
+                        .fade(duration: 0.25) // Smooth transition on first fetch
+                        .scaledToFill()
+                        .frame(width: 34, height: 34)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(isIncomingMessage ? brandBlue : Color.clear, lineWidth: 0.5)
+                        )
+                        .shadow(color: isIncomingMessage ? shadowBlue.opacity(0.8) : .black.opacity(0.5),
+                                radius: 3, x: 2, y: 1)
+                }  else {
                     // Scenario 3: imageURL is nil or invalid string
                     placeholderView
                         .padding(.trailing, 4)

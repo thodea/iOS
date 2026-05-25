@@ -8,6 +8,7 @@
 
 import SwiftUI
 import FirebaseFirestore
+import Kingfisher
 
 struct ChatsView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -54,7 +55,7 @@ struct ChatsView: View {
                     
                     // 3. Optional: Pagination Loader
                     if chatsViewModel.isLoading {
-                        ContinuousProgressView()
+                        ContinuousProgressView().transition(.opacity.animation(.default.delay(1)))
                     } else if chatsViewModel.canLoadMore {
                         Color.clear
                             .onAppear {
@@ -263,8 +264,25 @@ class ChatsViewModel: ObservableObject {
                 } else {
                     self.chats.append(contentsOf: sorted)
                 }
+                self.preloadChatImages(for: sorted)
                 self.isLoading = false // FINALLY SET TO FALSE
             }
         }
+    }
+    /// Preheats the cache with profile images before the view even asks for them
+    private func preloadChatImages(for chats: [Chat]) {
+        let urls = chats.compactMap { chat -> URL? in
+            guard let urlString = chat.imageURL else { return nil }
+            return URL(string: urlString)
+        }
+        
+        // Kingfisher ImagePrefetcher downloads and caches images in the background
+        let prefetcher = ImagePrefetcher(urls: urls, completionHandler:  { skippedResources, failedResources, completedResources in
+            // Optional: Handle telemetry or debugging logs here
+#if DEBUG
+            print("Successfully preloaded \(completedResources.count) images.")
+#endif
+        })
+        prefetcher.start()
     }
 }
