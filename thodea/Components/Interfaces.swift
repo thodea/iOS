@@ -146,7 +146,7 @@ struct Message: Identifiable, Hashable {
     let message: String
     let messagedBy: User
     let messagedAt: Date
-    let loved: Bool
+    var loved: Bool
     
     let assetType: String?
     let assetUrl: String?

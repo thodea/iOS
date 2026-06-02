@@ -15,7 +15,7 @@ class ChatHelper: ObservableObject {
     init() {
          let mockUsers = [
             User(
-                username: "Me",
+                username: "nik",
                 followers: 120,
                 followings: 85,
                 thoughts: 42,
@@ -30,7 +30,7 @@ class ChatHelper: ObservableObject {
                 deleted: false
             ),
             User(
-                username: "delete",
+                username: "test",
                 followers: 200,
                 followings: 150,
                 thoughts: 30,
@@ -45,7 +45,7 @@ class ChatHelper: ObservableObject {
                 deleted: false
             ),
             User(
-                username: "Me",
+                username: "nik",
                 followers: 200,
                 followings: 150,
                 thoughts: 30,
@@ -125,5 +125,16 @@ class ChatHelper: ObservableObject {
     
     func deleteMessage(id: String?) {
         realTimeMessages.removeAll { $0.id == id }
+    }
+    
+    func toggleLike(id: String) {
+        // 1. Locate the correct message by its unique ID
+        if let index = realTimeMessages.firstIndex(where: { $0.id == id }) {
+            // 2. Toggle the state inside the array
+            realTimeMessages[index].loved.toggle()
+            
+            // Note: Because realTimeMessages is marked @Published,
+            // this change automatically broadcasts an update to your SwiftUI views!
+        }
     }
 }

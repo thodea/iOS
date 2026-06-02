@@ -95,13 +95,20 @@ struct UserChatView: View {
     }
 
     private var messageList: some View {
-        ForEach(chatHelper.realTimeMessages, id: \.id) { msg in
+        ForEach($chatHelper.realTimeMessages) { $msg in
             let isCurrentUser = viewModel.currentUser?.username ?? "" == msg.messagedBy.username
             // Pass the new parameters here
             ContentMessageView(
                 contentMessage: msg.message,
                 isCurrentUser: isCurrentUser,
                 createdAt: msg.messagedAt,
+                isLiked: Binding(
+                    get: { msg.loved },
+                    set: { newValue in
+                        // Trigger your backend/state update here
+                        chatHelper.toggleLike(id: msg.id ?? "1")
+                    }
+                ),
                 onDelete: { chatHelper.deleteMessage(id: msg.id) },
                 attachedImage: msg.attachedImage,       // <--- INJECT
                 attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
