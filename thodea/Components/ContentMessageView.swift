@@ -29,6 +29,7 @@ struct ContentMessageView: View {
     var contentMessage: String
     var isCurrentUser: Bool
     var createdAt: Date?
+    @Binding var isLiked: Bool
     var onDelete: () -> Void // Add this callback
     
     // --- NEW: Optional Media Properties ---
@@ -38,7 +39,8 @@ struct ContentMessageView: View {
 
     @State private var isPreviewOpen: Bool = false // State for the preview
     
-    @State private var isLiked: Bool = false
+    
+    //@State private var isLiked: Bool = false
     @State private var heartScale: CGFloat = 1.0
     @State private var player: AVPlayer? = nil
 
@@ -239,6 +241,7 @@ struct ContentMessageView_Previews: PreviewProvider {
                     contentMessage: "Text only message test.com s",
                     isCurrentUser: true,
                     createdAt: Date(),
+                    isLiked: .constant(false),
                     onDelete: {}
                 )
                 
@@ -247,6 +250,7 @@ struct ContentMessageView_Previews: PreviewProvider {
                     contentMessage: "Look at this photo!",
                     isCurrentUser: false,
                     createdAt: Date(),
+                    isLiked: .constant(false),
                     onDelete: {},
                     attachedImage: UIImage(systemName: "photo.fill")?.withTintColor(.purple, renderingMode: .alwaysOriginal)
                 )
