@@ -238,13 +238,13 @@ struct ChatView: View {
                 }*/
            
         }
-        .onChange(of: urlToOpen) { newURL in
-            if newURL != nil {
-                    //print("New URL: \(newURL.absoluteString)")
-                } else {
-                    //print("URL was reset.")
-                }
+        .onChange(of: urlToOpen) { oldValue, newValue in
+            if newValue != nil {
+                // print("New URL: \(newValue.absoluteString)")
+            } else {
+                // print("URL was reset.")
             }
+        }
         .background(Color(red: 17/255, green: 24/255, blue: 39/255))
         .cornerRadius(5)
         .shadow(color: .black, radius: 2, x: 1, y: 2)

@@ -25,45 +25,66 @@ struct ChatsView: View {
     }
     
     var body: some View {
-            /*VStack(spacing: 16) {
-                // Search TextField
-                /*HStack(){
-                    Text("chats")
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8).font(.system(size: 19)).foregroundColor(.white.opacity(0.6))*/
-                                        
-               
+            ZStack {
+                // Main App Background
+                Color(red: 17/255, green: 24/255, blue: 39/255)
+                    .ignoresSafeArea()
+                /*VStack(spacing: 16) {
+                 // Search TextField
+                 /*HStack(){
+                  Text("chats")
+                  }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8).font(.system(size: 19)).foregroundColor(.white.opacity(0.6))*/
+                 
+                 
+                 
+                 /* NavigationLink(destination: MessagesView(username: mockUser.username, miniImageData: nil)) {
+                  ChatView(chat: mockThought)
+                  }
+                  
+                  ChatView(chat: mockThought)*/
+                 
+                 Spacer()
+                 
+                 }*/
                 
-               /* NavigationLink(destination: MessagesView(username: mockUser.username, miniImageData: nil)) {
-                                ChatView(chat: mockThought)
-                            }
-                
-                ChatView(chat: mockThought)*/
-
-                Spacer()
-
-            }*/
-            ScrollView {
-                VStack(spacing: 16) {
-                    // 2. Iterate over the fetched chats
-                    ForEach(chatsViewModel.chats) { chat in
-                        let otherUser = chat.otherUser(currentUsername: username)
+                // Conditional State Handling
+                if chatsViewModel.chats.isEmpty && chatsViewModel.isLoading {
+                    // 1. SHOW INITIAL LOADER (0.2 Opacity Gray Progress View)
+                    VStack {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                            .opacity(0.2)
+                            .scaleEffect(1.5)
+                            .padding(.top, 24) // Adjust this value to get the perfect spacing from your nav bar
                         
-                        NavigationLink(destination: MessagesView( username: otherUser, miniImageData: nil, chat: chat)) {
-                            ChatView(chat: chat)
-                        }
+                        Spacer() // Crucial: Pushes everything above it to the top of the screen
                     }
+                } else {
                     
-                    // 3. Optional: Pagination Loader
-                    if chatsViewModel.isLoading {
-                        ContinuousProgressView().transition(.opacity.animation(.default.delay(1)))
-                    } else if chatsViewModel.canLoadMore {
-                        Color.clear
-                            .onAppear {
-                                chatsViewModel.fetchChats(username: username, isFirstLoad: false)
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // 2. Iterate over the fetched chats
+                            ForEach(chatsViewModel.chats) { chat in
+                                let otherUser = chat.otherUser(currentUsername: username)
+                                
+                                NavigationLink(destination: MessagesView( username: otherUser, miniImageData: nil, chat: chat)) {
+                                    ChatView(chat: chat)
+                                }
                             }
+                            
+                            // 3. Optional: Pagination Loader
+                            if chatsViewModel.isLoading {
+                                ContinuousProgressView().transition(.opacity.animation(.default.delay(1)))
+                            } else if chatsViewModel.canLoadMore {
+                                Color.clear
+                                    .onAppear {
+                                        chatsViewModel.fetchChats(username: username, isFirstLoad: false)
+                                    }
+                            }
+                        }
+                        .padding()
                     }
                 }
-                .padding()
             }
             .frame(maxWidth: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
             .foregroundColor(.white.opacity(0.9))

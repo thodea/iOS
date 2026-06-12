@@ -13,7 +13,7 @@ class ChatHelper: ObservableObject {
     @Published var realTimeMessages: [Message] = []
     
     init() {
-         let mockUsers = [
+         /*let mockUsers = [
             User(
                 username: "nik",
                 followers: 120,
@@ -59,7 +59,7 @@ class ChatHelper: ObservableObject {
                 profileMiniUrl: "https://example.com/images/bob-mini.jpg",
                 deleted: false
             )
-         ]
+         ]*/
 
          /*realTimeMessages = (1...3).map { i in
              Message(
@@ -72,7 +72,7 @@ class ChatHelper: ObservableObject {
             Message(
                 id: String(i),
                 message: "test.com google.com http://google.com www.thodea.com https://www.thodea.com message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock message mock e\(i)",
-                messagedBy: mockUsers[i % mockUsers.count], // Safely wraps around
+                messagedBy: "str", // Safely wraps around
                 messagedAt: Date().addingTimeInterval(Double(-600 + (i * 60))),
                 loved: true,
                 assetType: "image/jpeg",
@@ -111,7 +111,7 @@ class ChatHelper: ObservableObject {
         let newMessage = Message(
             id: id,
             message: content,
-            messagedBy: user,
+            messagedBy: "str",
             messagedAt: Date(),
             loved: false,
             assetType: nil,

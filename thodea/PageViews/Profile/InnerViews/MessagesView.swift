@@ -27,7 +27,7 @@ struct MessagesView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            UserChatView().environmentObject(chatHelper)
+            UserChatView(chatId: chat?.id ?? "")
         }
         //.border(.green, width: 2)
         //.edgesIgnoringSafeArea(.bottom)
@@ -36,9 +36,21 @@ struct MessagesView: View {
         //.border(.red, width: 2)
         .navigationBarBackButtonHidden(true)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color(red: 17/255, green: 24/255, blue: 39/255), for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        //.toolbarBackground(.hidden, for: .navigationBar)
+        //.toolbarBackground(Color(red: 17/255, green: 24/255, blue: 39/255), for: .navigationBar)
+        //.toolbarBackground(.visible, for: .navigationBar)
         .preferredColorScheme(.dark)
+        // 1. Completely hide the native bar plate to KILL the gray border line
+        .toolbarBackground(.hidden, for: .navigationBar)
+        
+        // 2. Inject a custom glass panel that expands to cover the toolbar space
+        .safeAreaInset(edge: .top) {
+            Color.clear
+                .frame(height: 0)
+                // No material = 100% pure color transparency, zero gray tints
+                .background(Color(red: 17/255, green: 24/255, blue: 39/255).opacity(0.7))
+                .background(.ultraThinMaterial)
+        }
         .toolbar {
             // Wrap both the back button and the user info in one HStack
             ToolbarItem(placement: .navigationBarLeading) {

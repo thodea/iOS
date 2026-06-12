@@ -150,7 +150,7 @@ struct SettingsView: View {
                 //.border(.green, width: 2)
                 
             }
-            .onChange(of: selectedURL) { newURL in }
+            .onChange(of: selectedURL) { _, newURL in }
             .padding()
             .frame(maxWidth: .infinity).background(Color(red: 17/255, green: 24/255, blue: 39/255)).foregroundColor(.white.opacity(0.9))
             .foregroundColor(.white.opacity(0.9))
