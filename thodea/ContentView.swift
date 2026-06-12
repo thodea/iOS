@@ -59,7 +59,7 @@ struct ContentView: View {
                     selectedNavItem = "feed"
                 }
             }
-            .onChange(of: authViewModel.userSession) { newUserSession in
+            .onChange(of: authViewModel.userSession) { _, newUserSession in
                 // Update navigation when auth state changes
                 if newUserSession != nil {
                     if selectedNavItem == "login" {

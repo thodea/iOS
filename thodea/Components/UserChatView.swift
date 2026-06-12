@@ -9,6 +9,7 @@ import SwiftUI
 import PhotosUI
 import AVFoundation
 import AVKit // <--- ADD THIS
+import FirebaseFirestore
 
 // 1. Helper Struct to make URL Identifiable for sheets
 struct PlayableVideo: Identifiable {
@@ -17,6 +18,9 @@ struct PlayableVideo: Identifiable {
 }
 
 struct UserChatView: View {
+    let chatId: String
+    @StateObject private var chatViewModel: ChatViewModel // Replaces ChatHelper
+    
     @State private var typingMessage: String = ""
     @EnvironmentObject var chatHelper: ChatHelper
     @EnvironmentObject var viewModel: AuthViewModel
@@ -33,6 +37,12 @@ struct UserChatView: View {
     @State private var showLimitWarning = false
     @State private var warningTimer: DispatchWorkItem? = nil
     private let charLimit = 1000
+    
+    // Custom initialization dynamically boots up the scoped listener
+    init(chatId: String) {
+        self.chatId = chatId
+        self._chatViewModel = StateObject(wrappedValue: ChatViewModel(chatId: chatId))
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -50,24 +60,85 @@ struct UserChatView: View {
         }
         .padding(0)
     }
+    
+    private func scrollToBottom(_ proxy: ScrollViewProxy, animate: Bool = true) {
+        // Safely unwrap both the last message AND its optional Firestore ID
+        if let lastMessage = chatViewModel.realTimeMessages.last, let messageId = lastMessage.id {
+            if animate {
+                withAnimation {
+                    proxy.scrollTo(messageId, anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo(messageId, anchor: .bottom)
+            }
+        }
+    }
 
     private var messageScrollView: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                VStack {
-                    messageList
-                }
-                .onChange(of: chatHelper.realTimeMessages.count) { newCount in
-                    if newCount > previousMessageCount && previousMessageCount != 0 {
-                        scrollToBottom(proxy, animate: true)
+            GeometryReader { geometry in // 1. Measure the exact available display height
+                ScrollView {
+                    VStack {
+                        if chatViewModel.isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                                .padding(.top, 24)
+                        } else {
+                            Spacer(minLength: 0) // 2. Acts like an elastic spring, pushing short lists down
+                            
+                            messageList
+                        }
                     }
-                    previousMessageCount = newCount
+                    // 3. CRITICAL: Forces the VStack to be at least as tall as the visible screen area
+                    .frame(minHeight: geometry.size.height)
+                    .onChange(of: chatViewModel.isLoading) { _, isLoading in
+                        if !isLoading {
+                            DispatchQueue.main.async {
+                                scrollToBottom(proxy, animate: false)
+                            }
+                        }
+                    }
+                    .onChange(of: chatViewModel.realTimeMessages.count) {  _, newCount in
+                        if newCount > previousMessageCount && previousMessageCount != 0 {
+                            scrollToBottom(proxy, animate: true)
+                        }
+                        previousMessageCount = newCount
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .defaultScrollAnchor(.bottom)
+                .onAppear {
+                    previousMessageCount = chatViewModel.realTimeMessages.count
+                    if !chatViewModel.isLoading {
+                        scrollToBottom(proxy, animate: false)
+                    }
                 }
             }
-            .onAppear {
-                previousMessageCount = chatHelper.realTimeMessages.count
-                scrollToBottom(proxy, animate: false)
-            }
+        }
+    }
+
+    private var messageList: some View {
+        ForEach($chatViewModel.realTimeMessages) { $msg in
+            let isCurrentUser = (viewModel.currentUser?.username ?? "") == msg.messagedBy
+            // Pass the new parameters here
+            ContentMessageView(
+                contentMessage: msg.message,
+                isCurrentUser: isCurrentUser,
+                createdAt: msg.messagedAt,
+                isLiked: Binding(
+                    get: { msg.loved },
+                    set: { newValue in
+                        // Trigger your backend/state update here
+                        chatViewModel.toggleLike(id: msg.id ?? "1")
+                    }
+                ),
+                onDelete: { chatViewModel.deleteMessage(id: msg.id) },
+                attachedImage: msg.attachedImage,       // <--- INJECT
+                attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
+            )
+            .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
+            .padding(.horizontal)
         }
     }
     
@@ -91,30 +162,6 @@ struct UserChatView: View {
             }
             warningTimer = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
-        }
-    }
-
-    private var messageList: some View {
-        ForEach($chatHelper.realTimeMessages) { $msg in
-            let isCurrentUser = viewModel.currentUser?.username ?? "" == msg.messagedBy.username
-            // Pass the new parameters here
-            ContentMessageView(
-                contentMessage: msg.message,
-                isCurrentUser: isCurrentUser,
-                createdAt: msg.messagedAt,
-                isLiked: Binding(
-                    get: { msg.loved },
-                    set: { newValue in
-                        // Trigger your backend/state update here
-                        chatHelper.toggleLike(id: msg.id ?? "1")
-                    }
-                ),
-                onDelete: { chatHelper.deleteMessage(id: msg.id) },
-                attachedImage: msg.attachedImage,       // <--- INJECT
-                attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
-            )
-            .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
-            .padding(.horizontal)
         }
     }
 
@@ -144,7 +191,7 @@ struct UserChatView: View {
                             .padding(.bottom, 3)
                             .foregroundColor(.blue)
                     }
-                    .onChange(of: selectedItem) { newItem in
+                    .onChange(of: selectedItem) { _, newItem in
                         Task {
                             await handleMediaSelection(newItem)
                         }
@@ -160,7 +207,7 @@ struct UserChatView: View {
                     .font(.system(size: 22))
                     .padding(.leading, 4)
                     .overlay(Rectangle().frame(height: 2).foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)), alignment: .bottom)
-                    .onChange(of: typingMessage) { newValue in
+                    .onChange(of: typingMessage) { _, newValue in
                                         handleTextChange(newValue)
                                     }
                 
@@ -271,17 +318,7 @@ struct UserChatView: View {
         }
     }
     
-    private func scrollToBottom(_ proxy: ScrollViewProxy, animate: Bool = true) {
-        if let lastMessage = chatHelper.realTimeMessages.last {
-            if animate {
-                withAnimation {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                }
-            } else {
-                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-            }
-        }
-    }
+   
 
     private var isSendDisabled: Bool {
         // 1. Basic validation: empty text and no media
@@ -352,7 +389,7 @@ struct UserChatView: View {
 
     private func checkAndTrimVideo(url: URL) async {
         print("[DEBUG] Checking video duration for: \(url.lastPathComponent)")
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         
         do {
             let duration = try await asset.load(.duration)
@@ -414,7 +451,7 @@ struct UserChatView: View {
         private func generateThumbnail() async {
             // Re-generate only if URL changes or thumbnail is missing
             print("[DEBUG] Generating thumbnail for \(url)")
-            let asset = AVAsset(url: url)
+            let asset = AVURLAsset(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true // Respects portrait/landscape
             
@@ -464,7 +501,7 @@ struct UserChatView: View {
 
 struct UserChatView_Previews: PreviewProvider {
     static var previews: some View {
-        UserChatView()
+        UserChatView(chatId: "test")
             .environmentObject(ChatHelper())
             .environmentObject(mockAuthViewModel)
             .preferredColorScheme(.dark)
@@ -489,5 +526,76 @@ struct UserChatView_Previews: PreviewProvider {
             deleted: false
         )
         return viewModel
+    }
+}
+
+class ChatViewModel: ObservableObject {
+    @Published var realTimeMessages: [Message] = []
+    @Published var isLoading: Bool = true
+    
+    private var db = Firestore.firestore()
+    private var listener: ListenerRegistration?
+    let chatId: String
+
+    init(chatId: String) {
+        self.chatId = chatId
+        self.startListening()
+    }
+
+    func startListening() {
+        //print("🚀 [Firestore] Starting listener for path: conversation/\(chatId)/messages")
+        
+        listener = db.collection("conversation")
+            .document(chatId)
+            .collection("messages")
+            .order(by: "messagedAt", descending: false)
+            .addSnapshotListener { [weak self] snapshot, error in
+                if error != nil {
+                    //print("❌ [Firestore] Network/Permission Error: \(error.localizedDescription)")
+                    DispatchQueue.main.async { self?.isLoading = false }
+                    return
+                }
+                
+                guard let documents = snapshot?.documents else {
+                    //print("⚠️ [Firestore] Snapshot triggered but documents collection is nil.")
+                    DispatchQueue.main.async { self?.isLoading = false }
+                    return
+                }
+                
+                // 1. Log the exact number of raw records sitting in your database
+                //print("📦 [Firestore] Received \(documents.count) raw documents from server.")
+                
+                DispatchQueue.main.async {
+                    self?.realTimeMessages = documents.compactMap { doc in
+                        do {
+                            // Attempt to decode cleanly
+                            let decodedMessage = try doc.data(as: Message.self)
+                            return decodedMessage
+                        } catch {
+                            // 2. Log exact field-level mapping failures
+                            print("🔥 [Decoder Error] Failed parsing document [ID: \(doc.documentID)]. Reason: \(error)")
+                            return nil
+                        }
+                    }
+                    
+                    // 3. Compare raw counts vs parsed counts
+                    //print("✅ [UI Update] Successfully loaded \(self?.realTimeMessages.count ?? 0) / \(documents.count) messages into state.")
+                    self?.isLoading = false
+                }
+            }
+    }
+
+    func toggleLike(id: String) {
+        // Implement your specific Firestore update document syntax here
+    }
+
+    func deleteMessage(id: String?) {
+        guard id != nil else { return }
+        // Implement your specific Firestore delete document syntax here
+    }
+
+    deinit {
+        // Clean up subscription natively when view leaves memory
+        listener?.remove()
     }
 }

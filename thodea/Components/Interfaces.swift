@@ -35,7 +35,7 @@ struct Thought: Identifiable {
     var profileDeleted: Bool?
 }
 
-struct User {
+struct User: Hashable, Codable {
     var username: String
     var followers: Int?
     var followings: Int?
@@ -141,10 +141,10 @@ struct Chat: Identifiable, Codable {
 }
 
 
-struct Message: Identifiable, Hashable {
+struct Message: Identifiable, Hashable, Codable {
     @DocumentID var id: String?
     let message: String
-    let messagedBy: User
+    let messagedBy: String
     let messagedAt: Date
     var loved: Bool
     
@@ -155,6 +155,17 @@ struct Message: Identifiable, Hashable {
     // Add these optional properties
     var attachedImage: UIImage?
     var attachedVideoURL: URL?
+    
+    // 3. Define CodingKeys mapping ONLY the actual Firestore database fields
+    enum CodingKeys: String, CodingKey {
+        case id
+        case message
+        case messagedBy
+        case messagedAt
+        case loved
+        case assetType
+        case assetUrl
+    }
     
     // Conformance for Hashable (needed for ScrollView logic usually)
     func hash(into hasher: inout Hasher) {

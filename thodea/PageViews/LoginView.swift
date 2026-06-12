@@ -86,7 +86,7 @@ struct LoginView: View {
                                 // 1. Prevents the device's keyboard from capitalizing the first letter
                                 .textInputAutocapitalization(.never)
                                 // 2. Converts the input to lowercase every time the text changes
-                                .onChange(of: email) { newValue in
+                                .onChange(of: email) { _, newValue in
                                     // This closure receives the new value after the text changes
                                     email = newValue.lowercased()
                                 }

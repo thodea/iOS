@@ -219,13 +219,13 @@ struct ThoughtView: View {
             .padding(.bottom, 6)
            
         }
-        .onChange(of: urlToOpen) { newURL in
+        .onChange(of: urlToOpen) { _, newURL in
             if newURL != nil {
-                    //print("New URL: \(newURL.absoluteString)")
-                } else {
-                    //print("URL was reset.")
-                }
+                //print("New URL: \(newURL.absoluteString)")
+            } else {
+                //print("URL was reset.")
             }
+        }
         .background(Color(red: 17/255, green: 24/255, blue: 39/255))
         .cornerRadius(5)
         .shadow(color: .black, radius: 2, x: 1, y: 2)

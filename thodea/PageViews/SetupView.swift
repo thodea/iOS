@@ -56,7 +56,7 @@ struct SetupView: View {
                             .font(.title2)
                     )
                     .focused($isUsernameFieldFocused) // 👈 Bind focus state
-                    .onChange(of: username) { newValue in
+                    .onChange(of: username) { _, newValue in
                         DispatchQueue.main.async {
                             let regex = "^[a-z0-9_]*$" // Only allows lowercase letters, numbers, and underscores
                             let filteredValue = newValue.lowercased().prefix(14) // Convert to lowercase & limit length

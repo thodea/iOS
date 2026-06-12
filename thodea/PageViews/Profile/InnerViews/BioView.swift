@@ -58,7 +58,7 @@ struct BioView: View {
                         .font(.system(size: 26))
                         .lineLimit(1)
                         .padding(.vertical, 4)
-                        .onChange(of: bioValue) { newValue in
+                        .onChange(of: bioValue) { _, newValue in
                             // Protect initial load
                             let originalBio = authViewModel.currentUser?.bio ?? ""
                             guard newValue != originalBio else { return }

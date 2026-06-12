@@ -380,7 +380,7 @@ struct ProfileBasicView: View {
             // 4. ATTACH THE PHOTO PICKER MODIFIER TO THE MAIN VIEW
             .photosPicker(isPresented: $showPhotosPicker, selection: $selectedPickerItem, matching: .images)
             // 5. HANDLE DATA LOADING WHEN SELECTION CHANGES
-            .onChange(of: selectedPickerItem) { newItem in
+            .onChange(of: selectedPickerItem) { oldItem, newItem in
                 Task {
                     guard let item = newItem else {
                         Logger.media.warning("Picker dismissed without selection.")
