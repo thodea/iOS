@@ -139,16 +139,6 @@ struct ContentMessageView: View {
                 if !isCurrentUser {
                     Button(action: {
                         isLiked.toggle()
-                        if isLiked {
-                            withAnimation(.spring(response: 0.15, dampingFraction: 0.4)) {
-                                heartScale = 1.2
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                    heartScale = 1.0
-                                }
-                            }
-                        }
                     }) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
                             .font(.system(size: 20))
@@ -156,6 +146,18 @@ struct ContentMessageView: View {
                             .scaleEffect(heartScale)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .onChange(of: isLiked) { oldValue, newValue in
+                        if newValue { // Only animate when switching from unliked to liked
+                            withAnimation(.spring(response: 0.15, dampingFraction: 0.4)) {
+                                heartScale = 1.2
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                                    heartScale = 1.0
+                                }
+                            }
+                        }
+                    }
                 }
             }
             .padding(isCurrentUser ? .leading : .trailing, 30)

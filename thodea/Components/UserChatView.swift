@@ -586,7 +586,31 @@ class ChatViewModel: ObservableObject {
     }
 
     func toggleLike(id: String) {
-        // Implement your specific Firestore update document syntax here
+        // 1. Optimistic UI Update (Immediate response for the user)
+        guard let index = realTimeMessages.firstIndex(where: { $0.id == id }) else { return }
+        let currentLovedState = realTimeMessages[index].loved
+        
+        realTimeMessages[index].loved.toggle()
+        
+        // 2. Exact Firestore Document Path reference
+        let messageRef = db.collection("conversation")
+            .document(chatId)
+            .collection("messages")
+            .document(id)
+        
+        // 3. Remote Server Mutation
+        messageRef.updateData(["loved": !currentLovedState]) { error in
+            if let error = error {
+                print("🔥 [Firestore Error] Failed to toggle like for message \(id): \(error.localizedDescription)")
+                
+                // 4. Rollback state on Main Thread if the network write fails
+                DispatchQueue.main.async { [weak self] in
+                    if let rollBackIndex = self?.realTimeMessages.firstIndex(where: { $0.id == id }) {
+                        self?.realTimeMessages[rollBackIndex].loved = currentLovedState
+                    }
+                }
+            }
+        }
     }
 
     func deleteMessage(id: String?) {
