@@ -211,7 +211,22 @@ struct UserChatView: View {
                                         handleTextChange(newValue)
                                     }
                 
-                Button(action: sendMessage) {
+                let currentUser = viewModel.currentUser?.username ?? ""
+                
+                Button(action: {
+                    // 1. Bridge the synchronous button action to Swift Concurrency
+                    Task {
+                        do {
+                            // 2. Await the throwing async operation
+                            try await chatViewModel.sendMessage(input: typingMessage, userName: currentUser)
+                            
+                            // 3. Clear the input field on the Main Actor upon success
+                            typingMessage = ""
+                        } catch {
+                            print("🔥 [Chat View Error] Could not send message: \(error.localizedDescription)")
+                        }
+                    }
+                }) {
                     Image(systemName: "paperplane.fill")
                         .resizable()
                         .scaledToFit()
@@ -621,5 +636,24 @@ class ChatViewModel: ObservableObject {
     deinit {
         // Clean up subscription natively when view leaves memory
         listener?.remove()
+    }
+    
+    func sendMessage(input: String, userName: String) async throws {
+        // 1. Reference the exact nested sub-collection path
+        let messagesCollection = db.collection("conversation")
+            .document(chatId)
+            .collection("messages")
+        
+        // 2. Construct the payload dictionary
+        let messageData: [String: Any] = [
+            "message": input,
+            "messagedBy": userName,
+            "messagedAt": Date(), // Swift Date automatically bridges to a Firestore Timestamp
+            "loved": false
+        ]
+        
+        // 3. Execute the asynchronous mutation
+        // addDocument automatically handles generating a unique document ID behind the scenes
+        _ = try await messagesCollection.addDocument(data: messageData)
     }
 }
