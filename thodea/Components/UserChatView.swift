@@ -121,6 +121,7 @@ struct UserChatView: View {
     private var messageList: some View {
         ForEach($chatViewModel.realTimeMessages) { $msg in
             let isCurrentUser = (viewModel.currentUser?.username ?? "") == msg.messagedBy
+            let currentUser = viewModel.currentUser?.username ?? ""
             // Pass the new parameters here
             ContentMessageView(
                 contentMessage: msg.message,
@@ -133,7 +134,7 @@ struct UserChatView: View {
                         chatViewModel.toggleLike(id: msg.id ?? "1")
                     }
                 ),
-                onDelete: { chatViewModel.deleteMessage(id: msg.id) },
+                onDelete: { chatViewModel.deleteMessage(id: msg.id, userName: currentUser) },
                 attachedImage: msg.attachedImage,       // <--- INJECT
                 attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
             )
@@ -356,7 +357,7 @@ struct UserChatView: View {
             }
         // Pass the state variables (selectedImage, selectedVideoURL) to the helper
         chatHelper.sendMessage(
-            typingMessage,
+            typingMessage.trimmingCharacters(in: .whitespacesAndNewlines),
             user: user,
             image: selectedImage,
             videoURL: selectedVideoURL,
@@ -628,22 +629,31 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    func deleteMessage(id: String?) {
-        // 1. Safe unwrap to prevent empty calls
-        guard let id = id else { return }
-        
-        // 2. Target the exact document path matching your Next.js structure
-        let messageRef = db.collection("conversation")
-            .document(chatId)
-            .collection("messages")
-            .document(id)
-        
-        // 3. Execute mutation
-        messageRef.delete { error in
+    func deleteMessage(id: String?, userName: String) {
+        guard let messageId = id else { return }
+
+        // 1. References
+        let conversationRef = db.collection("conversation").document(chatId)
+        let messageRef = conversationRef.collection("messages").document(messageId)
+
+        // 2. Prepare the Batch
+        let batch = db.batch()
+
+        // Step A: Delete the specific message
+        batch.deleteDocument(messageRef)
+
+        // Step B: Update the conversation root (matching your Next.js logic)
+        let updateData: [String: Any] = [
+            "lastMessage": NSNull(), // Bridging null to Firestore
+            "lastMessagedAt": Date(),
+            "lastMessagedBy": userName
+        ]
+        batch.updateData(updateData, forDocument: conversationRef)
+
+        // 3. Commit the Batch
+        batch.commit { error in
             if let error = error {
-                print("🔥 [Firestore Error] Failed to delete message \(id): \(error.localizedDescription)")
-                // No manual rollback needed here; Firestore's snapshot listener
-                // automatically reverts the UI if the server rejects the write.
+                print("🔥 [Firestore Error] Atomic delete failed: \(error.localizedDescription)")
             }
         }
     }
@@ -654,21 +664,40 @@ class ChatViewModel: ObservableObject {
     }
     
     func sendMessage(input: String, userName: String) async throws {
-        // 1. Reference the exact nested sub-collection path
-        let messagesCollection = db.collection("conversation")
-            .document(chatId)
-            .collection("messages")
+        // 1. References for the parent conversation and the nested messages sub-collection
+        let conversationDocRef = db.collection("conversation").document(chatId)
+        let messagesCollection = conversationDocRef.collection("messages")
         
-        // 2. Construct the payload dictionary
+        // Create a new document reference with an auto-generated ID (offline-ready)
+        let newMessageDocRef = messagesCollection.document()
+        
+        let now = Date() // Shared timestamp matching your JS `date`
+        
+        // 2. Payloads
         let messageData: [String: Any] = [
             "message": input,
             "messagedBy": userName,
-            "messagedAt": Date(), // Swift Date automatically bridges to a Firestore Timestamp
+            "messagedAt": now,
             "loved": false
         ]
         
-        // 3. Execute the asynchronous mutation
-        // addDocument automatically handles generating a unique document ID behind the scenes
-        _ = try await messagesCollection.addDocument(data: messageData)
+        let conversationUpdateData: [String: Any] = [
+            "lastMessage": input,
+            "lastMessagedAt": now,
+            "lastMessagedBy": userName,
+            "newMessageFrom": userName
+        ]
+        
+        // 3. Atomic Batch Write (The Next.js Equivalent)
+        let batch = db.batch()
+        
+        // Set the new message data
+        batch.setData(messageData, forDocument: newMessageDocRef)
+        
+        // Update the parent conversation fields (merges seamlessly, like updateDoc)
+        batch.updateData(conversationUpdateData, forDocument: conversationDocRef)
+        
+        // Commit the batch atomically
+        try await batch.commit()
     }
 }
