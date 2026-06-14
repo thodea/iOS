@@ -111,8 +111,8 @@ struct MessagesView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     // Initial "Delete" option (corresponds to setDeleteConvo(true))
-                    NavigationLink(destination: ChatsView()) {                        Label("Chats", systemImage: "envelope")
-                    }
+                    /*NavigationLink(destination: ChatsView()) {                        Label("Chats", systemImage: "envelope")
+                    }*/
                     
                     Button(role: .destructive) {
                         showDeleteConfirmation = true

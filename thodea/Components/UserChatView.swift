@@ -629,8 +629,23 @@ class ChatViewModel: ObservableObject {
     }
 
     func deleteMessage(id: String?) {
-        guard id != nil else { return }
-        // Implement your specific Firestore delete document syntax here
+        // 1. Safe unwrap to prevent empty calls
+        guard let id = id else { return }
+        
+        // 2. Target the exact document path matching your Next.js structure
+        let messageRef = db.collection("conversation")
+            .document(chatId)
+            .collection("messages")
+            .document(id)
+        
+        // 3. Execute mutation
+        messageRef.delete { error in
+            if let error = error {
+                print("🔥 [Firestore Error] Failed to delete message \(id): \(error.localizedDescription)")
+                // No manual rollback needed here; Firestore's snapshot listener
+                // automatically reverts the UI if the server rejects the write.
+            }
+        }
     }
 
     deinit {
