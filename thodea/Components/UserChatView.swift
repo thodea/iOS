@@ -19,6 +19,8 @@ struct PlayableVideo: Identifiable {
 
 struct UserChatView: View {
     let chatId: String
+    let onMessageUpdated: ((String, Date, String) -> Void)? // Updated signature
+    
     @StateObject private var chatViewModel: ChatViewModel // Replaces ChatHelper
     
     @State private var typingMessage: String = ""
@@ -38,9 +40,9 @@ struct UserChatView: View {
     @State private var warningTimer: DispatchWorkItem? = nil
     private let charLimit = 1000
     
-    // Custom initialization dynamically boots up the scoped listener
-    init(chatId: String) {
-        self.chatId = chatId
+    // Updated Initializer
+    init(chatId: String, onMessageUpdated: ((String, Date, String) -> Void)? = nil) {        self.chatId = chatId
+        self.onMessageUpdated = onMessageUpdated
         self._chatViewModel = StateObject(wrappedValue: ChatViewModel(chatId: chatId))
     }
 
@@ -53,6 +55,16 @@ struct UserChatView: View {
                 .padding(.horizontal, 16)
         }
         .background(Color(red: 17/255, green: 24/255, blue: 39/255))
+        .onChange(of: chatViewModel.realTimeMessages) { _, newMessages in
+            if let latestMessage = newMessages.last {
+                // Safely extract text, date, and sender data elements
+                onMessageUpdated?(
+                    latestMessage.message,
+                    latestMessage.messagedAt,
+                    latestMessage.messagedBy
+                )
+            }
+        }
         .alert("Video Too Long", isPresented: $showVideoLengthAlert) {
             Button("OK", role: .cancel) { }
         } message: {

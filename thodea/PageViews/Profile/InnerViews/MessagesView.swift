@@ -18,16 +18,19 @@ struct MessagesView: View {
     let username: String
     let miniImageData: Data?
     let chat: Chat?
-    
-    init(username: String, miniImageData: Data? = nil, chat: Chat? = nil) {
+    let onMessageUpdated: ((String, Date, String) -> Void)? // Added closure property
+        
+    // Updated Initializer
+    init(username: String, miniImageData: Data? = nil, chat: Chat? = nil, onMessageUpdated: ((String, Date, String) -> Void)? = nil) {
         self.username = username
         self.miniImageData = miniImageData
         self.chat = chat
+        self.onMessageUpdated = onMessageUpdated
     }
     
     var body: some View {
         VStack(spacing: 16) {
-            UserChatView(chatId: chat?.id ?? "")
+            UserChatView(chatId: chat?.id ?? "", onMessageUpdated: onMessageUpdated)
         }
         //.border(.green, width: 2)
         //.edgesIgnoringSafeArea(.bottom)
