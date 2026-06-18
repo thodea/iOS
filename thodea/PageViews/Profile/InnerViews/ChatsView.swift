@@ -67,7 +67,13 @@ struct ChatsView: View {
                             ForEach(chatsViewModel.chats) { chat in
                                 let otherUser = chat.otherUser(currentUsername: username)
                                 
-                                NavigationLink(destination: MessagesView( username: otherUser, miniImageData: nil, chat: chat)) {
+                                NavigationLink(destination: MessagesView(
+                                    username: otherUser,
+                                    miniImageData: nil,
+                                    chat: chat,
+                                    onMessageUpdated: { text, date, sender in
+                                        chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender)
+                                    })) {
                                     ChatView(chat: chat)
                                 }
                             }
@@ -305,5 +311,18 @@ class ChatsViewModel: ObservableObject {
 #endif
         })
         prefetcher.start()
+    }
+    
+    func updateChatState(chatId: String, text: String, date: Date, sender: String) {        guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
+        
+        // 1. Update the parent local state fields
+        // (Ensure 'lastMessage' matches the exact property name on your Chat model)
+        chats[index].lastMessage = text
+        chats[index].lastMessagedAt = date
+        chats[index].lastMessagedBy = sender
+        chats[index].newMessageFrom = sender
+        
+        // 2. Immediately re-sort the array so active conversations bubble to the top
+        chats.sort { ($0.lastMessagedAt ?? .distantPast) > ($1.lastMessagedAt ?? .distantPast) }
     }
 }
