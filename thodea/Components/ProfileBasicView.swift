@@ -674,13 +674,15 @@ struct ProfileBasicView: View {
 
                 // 4. Define metadata
                 let ext = "jpg" // Since we forced JPEG compression, extension is now jpg
+                let timestamp = Int(Date().timeIntervalSince1970 * 1000)
                 
                 // 5. Upload to Bunny
                 // The service now handles the signing and the PUT request
                 let finalCdnUrl = try await bunnyService.uploadImage(
                     data: compressedData,
                     username: username,
-                    fileExtension: ext
+                    fileExtension: ext,
+                    path: "user/\(username)/asset\(timestamp).\(ext)"
                 )
 
                 // Check if we got a URL back (since the function returns String?)

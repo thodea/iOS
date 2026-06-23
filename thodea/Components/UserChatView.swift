@@ -10,6 +10,7 @@ import PhotosUI
 import AVFoundation
 import AVKit // <--- ADD THIS
 import FirebaseFirestore
+import FirebaseAuth
 
 // 1. Helper Struct to make URL Identifiable for sheets
 struct PlayableVideo: Identifiable {
@@ -25,6 +26,7 @@ struct UserChatView: View {
     
     @State private var typingMessage: String = ""
     @EnvironmentObject var chatHelper: ChatHelper
+    @EnvironmentObject var bunnyService: BunnyUploadService
     @EnvironmentObject var viewModel: AuthViewModel
     @State private var previousMessageCount: Int = 0
     
@@ -146,8 +148,12 @@ struct UserChatView: View {
                         chatViewModel.toggleLike(id: msg.id ?? "1")
                     }
                 ),
-                onDelete: { chatViewModel.deleteMessage(id: msg.id, userName: currentUser) },
-                attachedImage: msg.attachedImage,       // <--- INJECT
+                onDelete: {
+                    Task {
+                        await chatViewModel.deleteMessage(id: msg.id, userName: currentUser, msg: msg)
+                    }
+                },
+                attachedImage: msg.assetUrl,       // <--- INJECT
                 attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
             )
             .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
@@ -230,13 +236,56 @@ struct UserChatView: View {
                     // 1. Bridge the synchronous button action to Swift Concurrency
                     Task {
                         do {
-                            // 2. Await the throwing async operation
-                            try await chatViewModel.sendMessage(input: typingMessage, userName: currentUser)
+                            let messageId = chatViewModel.generateMessageId()
+                            var finalAssetUrl: String? = nil
+                            var assetFileType: String? = nil
                             
-                            // 3. Clear the input field on the Main Actor upon success
+                            // 1. If an image is selected, process and upload it first
+                            if let uiImage = selectedImage {
+                                viewModel.isUploading = true
+                                guard let compressedData = uiImage.jpegData(compressionQuality: 0.80) else {
+                                    print("🔥 Image compression failed.")
+                                    return
+                                }
+                                let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+
+                                let ext = "jpg"
+                                let path = "conversation/\(chatId)/messages/\(messageId)/asset\(timestamp).\(ext)"
+                                
+                                // Await the safe background upload thread
+                                finalAssetUrl = try await bunnyService.uploadImage(
+                                    data: compressedData,
+                                    username: currentUser,
+                                    fileExtension: ext,
+                                    path: path
+                                )
+                                assetFileType = "image/\(ext)"
+                            }
+                            
+                            // 2. Pass any resolved endpoints into the structural firestore payload
+                            try await chatViewModel.sendMessage(
+                                messageId: messageId,
+                                input: typingMessage,
+                                userName: currentUser,
+                                assetUrl: finalAssetUrl,
+                                assetType: assetFileType
+                            )
+                            
+                            // 3. UI Cleanup on Main Actor upon successful delivery
                             typingMessage = ""
+                            selectedImage = nil
+                            selectedItem = nil
+                            bunnyService.progress = 0.0
+                            bunnyService.isUploading = false
+                            viewModel.isUploading = false
+                            
                         } catch {
-                            print("🔥 [Chat View Error] Could not send message: \(error.localizedDescription)")
+                            await MainActor.run {
+                                bunnyService.progress = 0.0
+                                bunnyService.isUploading = false
+                                viewModel.isUploading = false
+                                print("🔥 [Chat View Error] Could not send message: \(error.localizedDescription)")
+                            }
                         }
                     }
                 }) {
@@ -361,7 +410,7 @@ struct UserChatView: View {
         return isContentEmpty || noUser || showLimitWarning
     }
     
-    private func sendMessage() {
+    /*private func sendMessage() {
         
         guard let user = viewModel.currentUser else {
                 print("[DEBUG] No current user found in AuthViewModel")
@@ -381,7 +430,7 @@ struct UserChatView: View {
         selectedImage = nil
         selectedVideoURL = nil
         selectedItem = nil
-    }
+    }*/
     
     private func handleMediaSelection(_ item: PhotosPickerItem?) async {
         guard let item = item else { return }
@@ -570,6 +619,11 @@ class ChatViewModel: ObservableObject {
         self.startListening()
     }
 
+    /// Generates a unique Firestore Document ID entirely client-side (no network cost).
+    func generateMessageId() -> String {
+        return db.collection("conversation").document(chatId).collection("messages").document().documentID
+    }
+
     func startListening() {
         //print("🚀 [Firestore] Starting listener for path: conversation/\(chatId)/messages")
         
@@ -641,7 +695,7 @@ class ChatViewModel: ObservableObject {
         }
     }
 
-    func deleteMessage(id: String?, userName: String) {
+    /*func deleteMessage(id: String?, userName: String) {
         guard let messageId = id else { return }
 
         // 1. References
@@ -668,31 +722,125 @@ class ChatViewModel: ObservableObject {
                 print("🔥 [Firestore Error] Atomic delete failed: \(error.localizedDescription)")
             }
         }
+    }*/
+    
+    /// Deletes a specific message and cleans up its remote CDN media if it exists
+    func deleteMessage(id: String?, userName: String, msg: Message) async {
+        guard let messageId = id else { return }
+        guard let user = Auth.auth().currentUser else {
+            print("🚫 [Auth Error] No current user found.")
+            return
+        }
+
+        // 1. Locate the message locally to verify if it contains an image asset
+        // (Change 'attachedImage' to your actual Message model property name if different)
+        let message = msg
+                
+        let hasImage = message.assetUrl != nil && message.assetType?.starts(with: "image") == true
+
+        // 2. Prepare Firestore atomic changes
+        let conversationRef = db.collection("conversation").document(chatId)
+        let messageRef = conversationRef.collection("messages").document(messageId)
+        
+        let batch = db.batch()
+        batch.deleteDocument(messageRef)
+
+        let updateData: [String: Any] = [
+            "lastMessage": NSNull(),
+            "lastMessagedAt": Date(),
+            "lastMessagedBy": userName
+        ]
+        batch.updateData(updateData, forDocument: conversationRef)
+        print(hasImage)
+        // 3. Execute CDN deletion and Firestore updates concurrently
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                
+                // Task A: Bunny CDN Deletion (Only triggers if image exists)
+                if hasImage {
+                    group.addTask {
+                        let token = try await user.getIDToken()
+                        
+                        guard let url = URL(string: "https://www.thodea.com/api/deleteImageBunny") else {
+                            throw URLError(.badURL)
+                        }
+
+                        // Payload meticulously structured to map to your Next.js parsing logic
+                        let payload: [String: Any] = [
+                            "query": [
+                                "username": userName,
+                                "email": user.email ?? "",
+                                "message": [
+                                    "convoId": self.chatId,
+                                    "messageId": messageId
+                                ]
+                            ]
+                        ]
+
+                        let bodyData = try JSONSerialization.data(withJSONObject: payload)
+                        
+                        var request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        request.httpBody = bodyData
+
+                        let (data, response) = try await URLSession.shared.data(for: request)
+                        
+                        if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                            let errorLog = String(data: data, encoding: .utf8) ?? "Unknown Error"
+                            print("⚠️ Bunny CDN API Error: \(errorLog)")
+                            throw URLError(.badServerResponse)
+                        }
+                    }
+                }
+
+                // Task B: Commit Firestore updates concurrently
+                group.addTask {
+                    try await batch.commit()
+                }
+
+                // Await both actions safely
+                try await group.waitForAll()
+            }
+            print("✅ Successfully deleted message document and associated Bunny CDN media assets.")
+            
+        } catch {
+            print("🔥 [Deletion Error] Process failed: \(error.localizedDescription)")
+        }
     }
+
 
     deinit {
         // Clean up subscription natively when view leaves memory
         listener?.remove()
     }
     
-    func sendMessage(input: String, userName: String) async throws {
+    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil) async throws {
         // 1. References for the parent conversation and the nested messages sub-collection
         let conversationDocRef = db.collection("conversation").document(chatId)
         let messagesCollection = conversationDocRef.collection("messages")
         
         // Create a new document reference with an auto-generated ID (offline-ready)
-        let newMessageDocRef = messagesCollection.document()
+        //let newMessageDocRef = messagesCollection.document()
+        let newMessageDocRef = messagesCollection.document(messageId)
         
         let now = Date() // Shared timestamp matching your JS `date`
         
         // 2. Payloads
-        let messageData: [String: Any] = [
+        var messageData: [String: Any] = [
             "message": input,
             "messagedBy": userName,
             "messagedAt": now,
             "loved": false
         ]
         
+        // Dynamic payload matching: ...(finalAssetUrl && { assetUrl, assetType })
+        if let assetUrl = assetUrl, let assetType = assetType {
+            messageData["assetUrl"] = assetUrl
+            messageData["assetType"] = assetType
+        }
+
         let conversationUpdateData: [String: Any] = [
             "lastMessage": input,
             "lastMessagedAt": now,

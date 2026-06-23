@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AVKit // <--- ADD THIS
+import Kingfisher
 
 
 struct PlayerViewController: UIViewControllerRepresentable {
@@ -33,7 +34,7 @@ struct ContentMessageView: View {
     var onDelete: () -> Void // Add this callback
     
     // --- NEW: Optional Media Properties ---
-    var attachedImage: UIImage? = nil
+    var attachedImage: String? = nil
     var attachedVideoURL: URL? = nil
     // --------------------------------------
 
@@ -101,14 +102,20 @@ struct ContentMessageView: View {
                 // --- MESSAGE CONTENT STACK (Media + Text) ---
                 VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
                     
-                    // 1. VIDEO ATTACHMENT
+                    // 1. VIDEO ATTACHM ENT
                     if let videoURL = attachedVideoURL {
                         MessageVideoView(url: videoURL)
                             .padding(.bottom, 2)
                     }
                     // 2. IMAGE ATTACHMENT
-                    else if let image = attachedImage {
-                        Image(uiImage: image)
+                    else if let urlStr = attachedImage, let url = URL(string: urlStr) {
+                        KFImage(url)
+                            .placeholder {
+                                ShimmerView()
+                                    .frame(minWidth: 125, minHeight: 125)
+                                    .frame(maxHeight: 300)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(minWidth: 125, minHeight: 125)
@@ -196,12 +203,12 @@ struct ContentMessageView: View {
             return .handled
         })
         .fullScreenCover(isPresented: $isPreviewOpen) {
-            if let image = attachedImage {
+            if let urlStr = attachedImage, let url = URL(string: urlStr) {
                 ZStack {
                     Color.black.opacity(0.95)
                         .ignoresSafeArea()
                     
-                    Image(uiImage: image)
+                    KFImage(url)
                         .resizable()
                         .scaledToFit()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -232,7 +239,7 @@ struct ContentMessageView: View {
 }
 
 // MARK: - Update Preview to Test
-struct ContentMessageView_Previews: PreviewProvider {
+/*struct ContentMessageView_Previews: PreviewProvider {
     static var previews: some View {
         ZStack {
             Color(red: 17/255, green: 24/255, blue: 39/255).ignoresSafeArea()
@@ -260,7 +267,7 @@ struct ContentMessageView_Previews: PreviewProvider {
             .padding()
         }
     }
-}
+}*/
 
 struct MessageVideoView: View {
     let url: URL

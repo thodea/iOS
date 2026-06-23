@@ -413,7 +413,6 @@ class AuthViewModel: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = bodyData
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = bodyData
     
