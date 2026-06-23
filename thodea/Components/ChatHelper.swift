@@ -83,10 +83,8 @@ class ChatHelper: ObservableObject {
      }
 
     
-    func sendMessage(_ content: String, user: User, image: UIImage? = nil, videoURL: URL? = nil, id: String) {
-        // Guard: ensure we have at least text OR media
-        guard !content.trimmingCharacters(in: .whitespaces).isEmpty || image != nil || videoURL != nil else { return }
-        
+    func sendMessage(_ content: String, user: User, attachedImageUrl: String? = nil, videoURL: URL? = nil, id: String) {        // Guard: ensure we have at least text OR media
+        guard !content.trimmingCharacters(in: .whitespaces).isEmpty || attachedImageUrl != nil || videoURL != nil else { return }
         /*
          
          let currentUser = User(
@@ -116,7 +114,7 @@ class ChatHelper: ObservableObject {
             loved: false,
             assetType: nil,
             assetUrl: nil,
-            attachedImage: image,
+            attachedImage: attachedImageUrl, // ✅ Now perfectly matching types (String? to String?)
             attachedVideoURL: videoURL
         )
         

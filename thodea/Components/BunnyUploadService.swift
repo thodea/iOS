@@ -18,7 +18,7 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
     
     private let signingEndpoint = "https://www.thodea.com/api/upload/sign"
 
-    func uploadImage(data: Data, username: String, fileExtension: String) async throws -> String? {
+    func uploadImage(data: Data, username: String, fileExtension: String, path: String) async throws -> String? {
         // 1. Get current user context
         guard let user = Auth.auth().currentUser, let email = user.email else {
             throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
@@ -28,8 +28,14 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
         let token = try await user.getIDToken()
     
         // 1. Construct the path here (Logic moved from View to Service)
-        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
-        let generatedPath = "user/\(username)/asset\(timestamp).\(fileExtension)"
+        //_ = Int(Date().timeIntervalSince1970 * 1000)
+        let generatedPath = path
+        
+        /*if (category == "profile") {
+            generatedPath = "user/\(username)/asset\(timestamp).\(fileExtension)"
+        } else if (category == "conversation") {
+            generatedPath = "conversation/\(conversationId)/messages\(messageId)/asset\(timestamp).\(fileExtension)"
+        }*/
 
         await MainActor.run {
             self.isUploading = true

@@ -153,7 +153,7 @@ struct Message: Identifiable, Hashable, Codable {
     
     
     // Add these optional properties
-    var attachedImage: UIImage?
+    var attachedImage: String?
     var attachedVideoURL: URL?
     
     // 3. Define CodingKeys mapping ONLY the actual Firestore database fields
