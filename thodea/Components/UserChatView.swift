@@ -115,7 +115,9 @@ struct UserChatView: View {
                     }
                     .onChange(of: chatViewModel.realTimeMessages.count) {  _, newCount in
                         if newCount > previousMessageCount && previousMessageCount != 0 {
-                            scrollToBottom(proxy, animate: true)
+                            DispatchQueue.main.async {
+                                scrollToBottom(proxy, animate: true)
+                            }
                         }
                         previousMessageCount = newCount
                     }
@@ -158,6 +160,7 @@ struct UserChatView: View {
             )
             .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
             .padding(.horizontal)
+            .id(msg.id)
         }
     }
     
