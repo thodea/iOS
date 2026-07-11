@@ -9,6 +9,7 @@
 import SwiftUI
 import AVKit // <--- ADD THIS
 import Kingfisher
+import Combine
 
 
 struct PlayerViewController: UIViewControllerRepresentable {
@@ -36,6 +37,7 @@ struct ContentMessageView: View {
     // --- NEW: Optional Media Properties ---
     var attachedImage: String? = nil
     var attachedVideoURL: URL? = nil
+    var posterLink: URL? = nil
     // --------------------------------------
 
     @State private var isPreviewOpen: Bool = false // State for the preview
@@ -103,10 +105,15 @@ struct ContentMessageView: View {
                 VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
                     
                     // 1. VIDEO ATTACHM ENT
+                    // 1. ADD THE FIELD INSIDE OPTIONAL MEDIA PROPERTIES SECTION (near top):
+                    //let posterUrl: String? = nil
+
+                    // 2. UPDATE THE VIDEO ATTACHMENT CALL INSIDE THE BODY STACK:
                     if let videoURL = attachedVideoURL {
-                        MessageVideoView(url: videoURL)
+                        MessageVideoView(url: videoURL, posterUrl: posterLink) // <-- Pass it here
                             .padding(.bottom, 2)
                     }
+                    
                     // 2. IMAGE ATTACHMENT
                     else if let urlStr = attachedImage, let url = URL(string: urlStr) {
                         KFImage(url)
@@ -170,13 +177,13 @@ struct ContentMessageView: View {
             .padding(isCurrentUser ? .leading : .trailing, 30)
 
             // --- TIMESTAMP & MENU ROW ---
-            HStack {
+            HStack(spacing: 0) {
                 if let createdAt = createdAt {
                     TimelineView(.periodic(from: Date(), by: 1)) { context in
                         Text(timeAgo(from: createdAt, now: context.date))
                             .font(.system(size: 16))
                             .foregroundColor(.gray.opacity(0.93))
-                            .italic()
+                            .italic()//.border(.red, width: 2)
                     }
                 }
                 
@@ -191,17 +198,21 @@ struct ContentMessageView: View {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.gray.opacity(0.93))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 10)
-                    }
+                            .padding(.leading, 6)
+                            .padding(.trailing, 2)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                            //.border(.green, width: 2)
+                    }//.border(.red, width: 2)
                 }
-            }
+            }//.border(.red, width: 2)
         }
         .preferredColorScheme(.dark)
         .environment(\.openURL, OpenURLAction { url in
             UIApplication.shared.open(url)
             return .handled
         })
+        //.border(.yellow, width: 2)
         .fullScreenCover(isPresented: $isPreviewOpen) {
             if let urlStr = attachedImage, let url = URL(string: urlStr) {
                 ZStack {
@@ -238,6 +249,188 @@ struct ContentMessageView: View {
     // --- THE FULL SCREEN COVER ---
 }
 
+struct MessageVideoView: View {
+    let url: URL
+    let posterUrl: URL?
+    
+    @State private var player = AVPlayer()
+    @State private var isPlaying = false
+    @State private var isAssetPrimed = false
+    @State private var showBufferingSpinner = false
+    
+    // --- NEW: Processing States ---
+    enum MediaStatus {
+        case ready
+        case processing
+    }
+    @State private var mediaStatus: MediaStatus = .ready
+    @State private var playerStatusCancellable: AnyCancellable?
+    // ------------------------------
+
+    var body: some View {
+        ZStack {
+            if isPlaying {
+                // --- STATE 1: ACTIVE VIDEO CONTAINER LAYER ---
+                PlayerViewController(player: player)
+                    .frame(width: 300, height: 350)
+                    .cornerRadius(10)
+                    .transition(.opacity)
+                
+                // Overlay clean loading indicator if CDN network experiences buffer hiccups
+                if showBufferingSpinner {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
+            } else {
+                // --- STATE 2: PRISTINE CACHED IDLE POSTER LAYER ---
+                ZStack {
+                    if let posterUrl = posterUrl {
+                        KFImage(posterUrl)
+                            .requestModifier(AnyModifier { request in
+                                var securedRequest = request
+                                securedRequest.setValue("https://www.thodea.com", forHTTPHeaderField: "Referer")
+                                securedRequest.setValue("MobileAppClient/1.0", forHTTPHeaderField: "User-Agent")
+                                return securedRequest
+                            })
+                            .retry(maxCount: 20, interval: .seconds(3))
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxHeight: 350)
+                            .clipped()
+                            .contentShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                Color.clear
+                                    .background(.ultraThinMaterial)
+                                    .opacity(0.2)
+                            )
+                            .overlay(mediaStatus == .processing ? Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2) : Color.black.opacity(0.15))
+                            .background(mediaStatus == .processing ? Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2) : Color(red: 23/255, green: 23/255, blue: 23/255))
+                            .cornerRadius(10)
+                            //.id(mediaStatus)
+                    } else {
+                        Color(mediaStatus == .processing ? Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2) : Color(red: 23/255, green: 23/255, blue: 23/255))
+                            .frame(width: 300, height: 350)
+                            .cornerRadius(10)
+                    }
+                    
+                    // --- NEW: UI Switch based on Processing State ---
+                    if mediaStatus == .processing {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            
+                            Text("Processing Media")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(Color(red: 38/255, green: 38/255, blue: 38/255)) // <-- Solid Dark Gray Badge Background
+                        .cornerRadius(12)
+                    } else {
+                        // Centered Floating Play Action Button Trigger
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 70))
+                            .foregroundColor(.white.opacity(0.9))
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
+                            .onTapGesture { play() }
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .onAppear {
+            primeVideoAsset()
+        }
+        .onDisappear {
+            pause()
+            playerStatusCancellable?.cancel() // Cleanup observer
+        }
+    }
+    
+    private func primeVideoAsset() {
+        guard !isAssetPrimed else { return }
+        
+        let headers: [String: String] = [
+            "Referer": "https://www.thodea.com",
+            "User-Agent": "MobileAppClient/1.0"
+        ]
+        let assetOptions = ["AVURLAssetHTTPHeaderFieldsKey": headers]
+        let asset = AVURLAsset(url: url, options: assetOptions)
+        let playerItem = AVPlayerItem(asset: asset)
+        
+        // 1. Observe Player Item Status to catch CDN 404s (Processing state)
+        playerStatusCancellable = playerItem.publisher(for: \.status)
+            .receive(on: DispatchQueue.main)
+            .sink { status in
+                if status == .failed {
+                    // Video likely isn't ready on Bunny CDN yet
+                    self.mediaStatus = .processing
+                    self.isAssetPrimed = false // Allow re-priming once ready
+                    self.pollForReadiness()
+                }
+            }
+        
+        player.replaceCurrentItem(with: playerItem)
+        isAssetPrimed = true
+        
+        // Listen to native pipeline buffer underflow state modifications
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemPlaybackStalled, object: playerItem, queue: .main) { _ in
+            showBufferingSpinner = true
+        }
+    }
+    
+    // --- NEW: Polling Logic ---
+    private func pollForReadiness() {
+        // Create an HTTP HEAD request (retrieves ONLY headers, no heavy video data downloaded)
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        request.setValue("https://www.thodea.com", forHTTPHeaderField: "Referer")
+        request.setValue("MobileAppClient/1.0", forHTTPHeaderField: "User-Agent")
+        
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            DispatchQueue.main.async {
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.scheduleNextPoll()
+                    return
+                }
+                
+                // If CDN returns 200 OK or 206 Partial Content, the transcode is done
+                if (200...299).contains(httpResponse.statusCode) {
+                    self.mediaStatus = .ready
+                    self.primeVideoAsset() // Retry loading into AVPlayer
+                } else {
+                    // Still processing (likely 403 or 404), check again in 5 seconds
+                    self.scheduleNextPoll()
+                }
+            }
+        }.resume()
+    }
+    
+    private func scheduleNextPoll() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            self.pollForReadiness()
+        }
+    }
+    // ----------------------------
+    
+    private func play() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isPlaying = true
+        }
+        player.play()
+    }
+    
+    private func pause() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            isPlaying = false
+        }
+        player.pause()
+    }
+}
+
 // MARK: - Update Preview to Test
 /*struct ContentMessageView_Previews: PreviewProvider {
     static var previews: some View {
@@ -269,6 +462,7 @@ struct ContentMessageView: View {
     }
 }*/
 
+/*
 struct MessageVideoView: View {
     let url: URL
     
@@ -334,3 +528,4 @@ struct MessageVideoView: View {
         player.seek(to: time)
     }
 }
+*/

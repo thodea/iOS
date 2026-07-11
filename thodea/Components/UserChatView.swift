@@ -95,8 +95,10 @@ struct UserChatView: View {
                     VStack {
                         if chatViewModel.isLoading {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.5)
+                                .controlSize(.large) // Sets it to the crisp, standard small size
+                                .tint(.white)
+                                .opacity(0.4)
+                                .scaleEffect(0.8)
                                 .padding(.top, 24)
                         } else {
                             Spacer(minLength: 0) // 2. Acts like an elastic spring, pushing short lists down
@@ -135,9 +137,11 @@ struct UserChatView: View {
     }
 
     private var messageList: some View {
-        ForEach($chatViewModel.realTimeMessages) { $msg in
+        ForEach(chatViewModel.realTimeMessages) { msg in
+            // 👇 ADD THIS TEMPORARY LINE HERE
             let isCurrentUser = (viewModel.currentUser?.username ?? "") == msg.messagedBy
             let currentUser = viewModel.currentUser?.username ?? ""
+    
             // Pass the new parameters here
             ContentMessageView(
                 contentMessage: msg.message,
@@ -155,8 +159,9 @@ struct UserChatView: View {
                         await chatViewModel.deleteMessage(id: msg.id, userName: currentUser, msg: msg)
                     }
                 },
-                attachedImage: msg.assetUrl,       // <--- INJECT
-                attachedVideoURL: msg.attachedVideoURL  // <--- INJECT
+                attachedImage: (msg.assetType?.hasPrefix("image") ?? false) ? msg.assetUrl : nil,
+                attachedVideoURL: (msg.assetType?.hasPrefix("video") ?? false) ? URL(string: msg.assetUrl ?? "") : nil,
+                posterLink: msg.posterUrl.flatMap { URL(string: $0) }
             )
             .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
             .padding(.horizontal)
@@ -219,7 +224,7 @@ struct UserChatView: View {
                         }
                     }
                     .padding(.trailing, 4)
-                }
+                } 
                 
                 TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.gray), axis: .vertical)
                     .lineLimit(1...6)
@@ -242,6 +247,8 @@ struct UserChatView: View {
                             let messageId = chatViewModel.generateMessageId()
                             var finalAssetUrl: String? = nil
                             var assetFileType: String? = nil
+                            var bunnyVideoId: String? = nil // <--- ADD THIS
+                            var posterUrl: String? = nil    // <--- ADD THIS
                             
                             // 1. If an image is selected, process and upload it first
                             if let uiImage = selectedImage {
@@ -263,6 +270,23 @@ struct UserChatView: View {
                                     path: path
                                 )
                                 assetFileType = "image/\(ext)"
+                            } else if let videoURL = selectedVideoURL {
+                                // --- NEW VIDEO UPLOAD INTEGRATION ROUTE ---
+                                viewModel.isUploading = true
+                                
+                                // Upload utilizing the local sandbox path provided by your Transferable struct
+                                if let videoMeta = try await bunnyService.uploadVideo(fileURL: videoURL, collectionName: chatId) {
+                                    finalAssetUrl = videoMeta.cdnUrl // The direct .m3u8 index stream route
+                                    let ext = videoURL.pathExtension.lowercased()
+                                    assetFileType = "video/\(ext == "mov" ? "mp4" : ext)"
+                                        
+                                    // Extracting the identical keys matching your Next.js state structure
+                                    bunnyVideoId = videoMeta.videoId
+                                    
+                                    // Replace string below with your production Bunny Stream Pull Zone configuration domain
+                                    let streamPullZone = AppConfig.streamPullZone
+                                    posterUrl = "https://\(streamPullZone)/\(videoMeta.videoId)/thumbnail.jpg"
+                                }
                             }
                             
                             // 2. Pass any resolved endpoints into the structural firestore payload
@@ -271,12 +295,15 @@ struct UserChatView: View {
                                 input: typingMessage,
                                 userName: currentUser,
                                 assetUrl: finalAssetUrl,
-                                assetType: assetFileType
+                                assetType: assetFileType,
+                                bunnyVideoId: bunnyVideoId, // <--- ADD THIS
+                                posterUrl: posterUrl
                             )
                             
                             // 3. UI Cleanup on Main Actor upon successful delivery
                             typingMessage = ""
                             selectedImage = nil
+                            selectedVideoURL = nil  // <-- ADD THIS TO RESET PREVIEW
                             selectedItem = nil
                             bunnyService.progress = 0.0
                             bunnyService.isUploading = false
@@ -729,18 +756,22 @@ class ChatViewModel: ObservableObject {
     
     /// Deletes a specific message and cleans up its remote CDN media if it exists
     func deleteMessage(id: String?, userName: String, msg: Message) async {
+        
         guard let messageId = id else { return }
         guard let user = Auth.auth().currentUser else {
             print("🚫 [Auth Error] No current user found.")
             return
         }
-
+        
         // 1. Locate the message locally to verify if it contains an image asset
         // (Change 'attachedImage' to your actual Message model property name if different)
         let message = msg
                 
         let hasImage = message.assetUrl != nil && message.assetType?.starts(with: "image") == true
-
+        let hasVideo = message.assetUrl != nil && message.assetType?.starts(with: "video") == true
+        let bunnyVideoId = message.bunnyVideoId // ⚠️ Ensure this matches your Message model property name        
+        print("🔍 [Data Trace] MessageId: \(messageId) | hasVideo: \(hasVideo) | bunnyVideoId: \(String(describing: bunnyVideoId))")
+        
         // 2. Prepare Firestore atomic changes
         let conversationRef = db.collection("conversation").document(chatId)
         let messageRef = conversationRef.collection("messages").document(messageId)
@@ -797,6 +828,42 @@ class ChatViewModel: ObservableObject {
                         }
                     }
                 }
+                
+                // Task B: Bunny CDN Video Deletion
+                if hasVideo, let videoId = bunnyVideoId, !videoId.isEmpty {
+                    
+                    group.addTask {
+                        let token = try await user.getIDToken()
+                        guard let url = URL(string: "https://www.thodea.com/api/deleteVideoBunny") else { throw URLError(.badURL) }
+
+                        let payload: [String: Any] = [
+                            "videoId": videoId,
+                            "username": userName,
+                            "email": user.email ?? ""
+                        ]
+
+                        let bodyData = try JSONSerialization.data(withJSONObject: payload)
+                        var request = URLRequest(url: url)
+                        request.httpMethod = "POST"
+                        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                        request.httpBody = bodyData
+
+                        let (data, response) = try await URLSession.shared.data(for: request)
+
+                        if let httpResponse = response as? HTTPURLResponse {
+                            if !(200...299).contains(httpResponse.statusCode) {
+                                throw URLError(.badServerResponse)
+                            }
+                        }
+                        
+                        // Check if server sent a 200 OK but embedded a "success: false" in the body
+                        if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let success = jsonObject["success"] as? Bool, !success {
+                            print("⚠️ Bunny CDN Video API responded with 200 OK but success was FALSE.")
+                        }
+                    }
+                }
 
                 // Task B: Commit Firestore updates concurrently
                 group.addTask {
@@ -819,7 +886,8 @@ class ChatViewModel: ObservableObject {
         listener?.remove()
     }
     
-    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil) async throws {
+    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil, bunnyVideoId: String? = nil, posterUrl: String? = nil
+        ) async throws {
         // 1. References for the parent conversation and the nested messages sub-collection
         let conversationDocRef = db.collection("conversation").document(chatId)
         let messagesCollection = conversationDocRef.collection("messages")
@@ -842,6 +910,14 @@ class ChatViewModel: ObservableObject {
         if let assetUrl = assetUrl, let assetType = assetType {
             messageData["assetUrl"] = assetUrl
             messageData["assetType"] = assetType
+        }
+        
+        // --- NEW VIDEO META MATCHING LOGIC ---
+        if let bunnyVideoId = bunnyVideoId {
+            messageData["bunnyVideoId"] = bunnyVideoId
+        }
+        if let posterUrl = posterUrl {
+            messageData["posterUrl"] = posterUrl
         }
 
         let conversationUpdateData: [String: Any] = [

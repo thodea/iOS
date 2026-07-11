@@ -76,7 +76,8 @@ class ChatHelper: ObservableObject {
                 messagedAt: Date().addingTimeInterval(Double(-600 + (i * 60))),
                 loved: true,
                 assetType: "image/jpeg",
-                assetUrl: "https://thodea.b-cdn.net/conversation/PB5zK88beAalQSJcRPMk/messages/1x2c6yv8NT4dqoGRuDfL/asset.jpeg"
+                assetUrl: "https://thodea.b-cdn.net/conversation/PB5zK88beAalQSJcRPMk/messages/1x2c6yv8NT4dqoGRuDfL/asset.jpeg",
+                posterUrl: nil
             )
         }
         
@@ -114,6 +115,7 @@ class ChatHelper: ObservableObject {
             loved: false,
             assetType: nil,
             assetUrl: nil,
+            posterUrl: nil,
             attachedImage: attachedImageUrl, // ✅ Now perfectly matching types (String? to String?)
             attachedVideoURL: videoURL
         )

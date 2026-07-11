@@ -150,7 +150,10 @@ struct Message: Identifiable, Hashable, Codable {
     
     let assetType: String?
     let assetUrl: String?
+    let posterUrl: String?
     
+    var bunnyVideoId: String?
+
     
     // Add these optional properties
     var attachedImage: String?
@@ -165,6 +168,8 @@ struct Message: Identifiable, Hashable, Codable {
         case loved
         case assetType
         case assetUrl
+        case posterUrl
+        case bunnyVideoId
     }
     
     // Conformance for Hashable (needed for ScrollView logic usually)
@@ -412,5 +417,27 @@ struct ShimmerView: View {
                 endPoint = UnitPoint(x: 3.0, y: 1.5)
             }
         }
+    }
+}
+
+
+// --- 1. NEW: High-Performance Solid Line Activity Spinner ---
+struct SolidCircularProgressViewStyle: ProgressViewStyle {
+    @State private var isAnimating = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        Circle()
+            .trim(from: 0.0, to: 0.7) // Clean 70% solid arc segment
+            .stroke(
+                Color.gray.opacity(0.6), // Solid gray hue
+                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+            )
+            .frame(width: 30, height: 30)
+            .rotationEffect(Angle(degrees: isAnimating ? 360 : 0))
+            .onAppear {
+                withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
+                    isAnimating = true
+                }
+            }
     }
 }

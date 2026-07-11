@@ -112,7 +112,73 @@ class BunnyUploadService: NSObject, ObservableObject, URLSessionTaskDelegate {
     
     }
     
-    
+    // Add this struct alongside BunnyAuthResponse
+    struct BunnyVideoAuthResponse: Codable {
+        let videoId: String
+        let libraryId: String
+        let accessKey: String
+        let cdnUrl: String
+    }
+
+    // Add this method inside your BunnyUploadService class
+    func uploadVideo(fileURL: URL, collectionName: String) async throws -> BunnyVideoAuthResponse? {
+        // 1. Get current user context and Firebase token
+        guard let user = Auth.auth().currentUser, let email = user.email else {
+            throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        let token = try await user.getIDToken()
+
+        await MainActor.run {
+            self.isUploading = true
+            self.progress = 0.0
+        }
+
+        // 2. Request Signing Details from Next.js backend
+        guard let signURL = URL(string: "https://www.thodea.com/api/upload/video-sign") else { return nil }
+        // Generate a clean, database-safe generic title using a millisecond timestamp
+        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+        let fileExtension = fileURL.pathExtension.lowercased()
+        let safeTitle = "\(timestamp).\(fileExtension)" // Results in: "1719992384000.mp4" (or .mov)
+        
+        var signRequest = URLRequest(url: signURL)
+        signRequest.httpMethod = "POST"
+        signRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        signRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        signRequest.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "title": safeTitle,
+            "collectionName": collectionName,
+            "email": email
+        ])
+
+        let (authData, _) = try await URLSession.shared.data(for: signRequest)
+        let authResponse = try JSONDecoder().decode(BunnyVideoAuthResponse.self, from: authData)
+
+        // 3. Construct Bunny Stream Endpoint PUT Request
+        guard let uploadURL = URL(string: "https://video.bunnycdn.com/library/\(authResponse.libraryId)/videos/\(authResponse.videoId)") else { return nil }
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "PUT"
+        request.setValue(authResponse.accessKey, forHTTPHeaderField: "AccessKey")
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+
+        let session = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
+        
+        // 4. Stream directly from file URL to prevent iOS out-of-memory app crashes
+        return try await withCheckedThrowingContinuation { continuation in
+            let task = session.uploadTask(with: request, fromFile: fileURL) { _, response, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                    continuation.resume(returning: authResponse)
+                } else {
+                    continuation.resume(throwing: URLError(.badServerResponse))
+                }
+            }
+            task.resume()
+        }
+    }
     
 }
 
