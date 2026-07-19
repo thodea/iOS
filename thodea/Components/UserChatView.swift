@@ -19,6 +19,7 @@ struct PlayableVideo: Identifiable {
 }
 
 struct UserChatView: View {
+    let chat: Chat?
     let chatId: String
     let onMessageUpdated: ((String, Date, String) -> Void)? // Updated signature
     
@@ -43,9 +44,11 @@ struct UserChatView: View {
     private let charLimit = 1000
     
     // Updated Initializer
-    init(chatId: String, onMessageUpdated: ((String, Date, String) -> Void)? = nil) {        self.chatId = chatId
+    init(chat: Chat?, onMessageUpdated: ((String, Date, String) -> Void)? = nil) {
+        self.chat = chat
+        self.chatId = chat?.id ?? "" // Keeps existing 'chatId' logic intact
         self.onMessageUpdated = onMessageUpdated
-        self._chatViewModel = StateObject(wrappedValue: ChatViewModel(chatId: chatId))
+        self._chatViewModel = StateObject(wrappedValue: ChatViewModel(chatId: chat?.id ?? ""))
     }
 
     var body: some View {
@@ -297,7 +300,8 @@ struct UserChatView: View {
                                 assetUrl: finalAssetUrl,
                                 assetType: assetFileType,
                                 bunnyVideoId: bunnyVideoId, // <--- ADD THIS
-                                posterUrl: posterUrl
+                                posterUrl: posterUrl,
+                                chat: chat
                             )
                             
                             // 3. UI Cleanup on Main Actor upon successful delivery
@@ -608,13 +612,28 @@ struct UserChatView: View {
 
 struct UserChatView_Previews: PreviewProvider {
     static var previews: some View {
-        UserChatView(chatId: "test")
+        // 1. Pass the mock chat instance here
+        UserChatView(chat: mockChat)
             .environmentObject(ChatHelper())
             .environmentObject(mockAuthViewModel)
+            .environmentObject(BunnyUploadService()) // Added to prevent runtime environment crashes
             .preferredColorScheme(.dark)
     }
     
-    // Move the logic here
+    // 2. Create a mock Chat data object
+    static var mockChat: Chat {
+        Chat(
+            id: "test_chat_id",
+            chatUsers: ["Me", "SomeoneElse"],
+            startedAt: Date(),
+            acceptedBy: ["Me", "SomeoneElse"],
+            allAccepted: true, // Set to true or false to test your new logic!
+            lastMessage: "Hey! How's it going?",
+            lastMessagedAt: Date(),
+            lastMessagedBy: "SomeoneElse"
+        )
+    }
+    
     static var mockAuthViewModel: AuthViewModel {
         let viewModel = AuthViewModel()
         viewModel.currentUser = User(
@@ -886,7 +905,7 @@ class ChatViewModel: ObservableObject {
         listener?.remove()
     }
     
-    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil, bunnyVideoId: String? = nil, posterUrl: String? = nil
+    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil, bunnyVideoId: String? = nil, posterUrl: String? = nil, chat: Chat? = nil
         ) async throws {
         // 1. References for the parent conversation and the nested messages sub-collection
         let conversationDocRef = db.collection("conversation").document(chatId)
@@ -936,6 +955,21 @@ class ChatViewModel: ObservableObject {
         // Update the parent conversation fields (merges seamlessly, like updateDoc)
         batch.updateData(conversationUpdateData, forDocument: conversationDocRef)
         
+        if let chat = chat {
+            let isConditionOne = (chat.allAccepted == false && chat.startedBy != userName)
+            let isConditionTwo = (chat.allAccepted == true)
+            
+            if isConditionOne || isConditionTwo {
+                // Find the other user using your model's helper function
+                let otherTargetUser = chat.otherUser(currentUsername: userName)
+                
+                if otherTargetUser != "~unknown" {
+                    let userDocRef = db.collection("user").document(otherTargetUser)
+                    batch.updateData(["newChat": true], forDocument: userDocRef)
+                }
+            }
+        }
+    
         // Commit the batch atomically
         try await batch.commit()
     }

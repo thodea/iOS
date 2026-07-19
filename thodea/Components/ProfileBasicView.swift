@@ -142,21 +142,29 @@ struct ProfileBasicView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                         
                         ZStack(alignment: .topTrailing) {
-                            // Envelope Image
-                            
+                            // Envelope Image Link
                             NavigationLink(destination: ChatsView()) {
                                 Image(systemName: "envelope")
                                     .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
                                     .font(.title2)
                                     .frame(maxWidth: 50, alignment: .trailing)
                             }
+                            // Fires exactly on touch down when the user navigates
+                            .simultaneousGesture(TapGesture().onEnded {
+                                if viewModel.currentUser?.newChat == true {
+                                    viewModel.clearNewChatNotification()
+                                }
+                            })
                             
-                            
-                            // Orange Circle at top-right corner
-                            /*Circle()
-                             .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
-                             .frame(width: 10, height: 10)
-                             .offset(x: 2, y: -2) */
+                            // Orange Notification Circle at top-right corner
+                            if viewModel.currentUser?.newChat == true {
+                                Circle()
+                                    .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
+                                    .frame(width: 10, height: 10)
+                                    .offset(x: 2, y: -2)
+                                    // Added cross-view transition animation support
+                                    .transition(.scale.combined(with: .opacity))
+                            }
                         }
                         .frame(width: 50, height: 24)// Adjust position if needed
                     }
@@ -591,6 +599,12 @@ struct ProfileBasicView: View {
                             }
                         }
                     }
+                }
+            }
+            .onAppear {
+                // Matches your Next.js useEffect mounting lifecycle conditions
+                if isCurrentUser && !isNavigated {
+                    viewModel.listenToCurrentUser()
                 }
             }
         }

@@ -306,9 +306,6 @@ class ChatsViewModel: ObservableObject {
         // Kingfisher ImagePrefetcher downloads and caches images in the background
         let prefetcher = ImagePrefetcher(urls: urls, completionHandler:  { skippedResources, failedResources, completedResources in
             // Optional: Handle telemetry or debugging logs here
-#if DEBUG
-            print("Successfully preloaded \(completedResources.count) images.")
-#endif
         })
         prefetcher.start()
     }

@@ -30,7 +30,10 @@ class AuthViewModel: ObservableObject {
     
     @Published var isUploading: Bool = false
     @Published var isDeleting: Bool = false
-
+    
+    private var userListener: ListenerRegistration?
+    private let db = Firestore.firestore()
+    
     init() {
         checkFirstRun()
         self.userSession = Auth.auth().currentUser
@@ -50,6 +53,57 @@ class AuthViewModel: ObservableObject {
         }
     }
     
+    /// Listens for real-time changes to the current user's profile document (like the newChat flag)
+    func listenToCurrentUser() {
+        guard let username = currentUser?.username, username != "@" else { return }
+        
+        // Prevent stacking duplicate listeners if this method gets triggered multiple times
+        userListener?.remove()
+        
+        userListener = db.collection("user").document(username)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                if let error = error {
+                    Logger().error("Error listening to user updates: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let document = snapshot, document.exists, let data = document.data() else { return }
+                
+                // Keep the UI thread perfectly synced
+                DispatchQueue.main.async {
+                    if let newChatValue = data["newChat"] as? Bool {
+                        self.currentUser?.newChat = newChatValue
+                    }
+                    if let followingValue = data["following"] as? [String] {
+                        self.currentUser?.following = followingValue
+                    }
+                }
+            }
+    }
+    
+    /// Clears the newChat flag instantly on the client side and persists it back to Firestore
+    func clearNewChatNotification() {
+        guard let username = currentUser?.username else { return }
+        
+        // 1. Optimistic UI update for immediate visual feedback
+        self.currentUser?.newChat = false
+        
+        // 2. Persist mutation safely back to database
+        db.collection("user").document(username).updateData(["newChat": false]) { error in
+            if let error = error {
+                Logger().error("Failed to clear newChat flag in cloud: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Explicitly detaches the real-time stream (Call this when executing your signOut logic)
+    func removeUserListener() {
+        userListener?.remove()
+        userListener = nil
+    }
+
+
     func primeCache(with data: Data, for urlString: String) {
         guard let url = URL(string: urlString) else { return }
         let request = URLRequest(url: url)
@@ -327,6 +381,7 @@ class AuthViewModel: ObservableObject {
     func signOut() {
         do {
             // NEED to make nil all items as they are cached... like all of user variables
+            removeUserListener()
             try Auth.auth().signOut()
             self.userSession = nil
             self.profileImageData = nil
@@ -341,6 +396,9 @@ class AuthViewModel: ObservableObject {
         }
     }
     
+    deinit {
+        removeUserListener()
+    }
 
     @MainActor // 👈 1. Ensures all state updates are 100% thread-safe
     func deleteAccount() async {

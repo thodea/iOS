@@ -30,7 +30,7 @@ struct MessagesView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            UserChatView(chatId: chat?.id ?? "", onMessageUpdated: onMessageUpdated)
+            UserChatView(chat: chat, onMessageUpdated: onMessageUpdated)
         }
         //.border(.green, width: 2)
         //.edgesIgnoringSafeArea(.bottom)
