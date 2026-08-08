@@ -73,7 +73,12 @@ struct ChatsView: View {
                                     chat: chat,
                                     onMessageUpdated: { text, date, sender in
                                         chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender)
-                                    })) {
+                                    }
+                                )
+                                .onAppear {
+                                    // Trigger mark-as-read reliably when entering the chat screen
+                                    chatsViewModel.markAsReadIfNeeded(chat: chat, currentUsername: username)
+                                }) {
                                     ChatView(chat: chat)
                                 }
                             }
@@ -224,6 +229,30 @@ class ChatsViewModel: ObservableObject {
         }
     }
 
+    func markAsReadIfNeeded(chat: Chat, currentUsername: String) {
+        // Condition: newMessageFrom is not nil and is NOT the current user
+        guard let newMessageFrom = chat.newMessageFrom,
+              !newMessageFrom.isEmpty,
+              newMessageFrom != currentUsername,
+              let chatId = chat.id,
+              !chatId.isEmpty else { return }
+
+        // 1. Optimistic Local Update (instantly removes badge in UI)
+        if let index = chats.firstIndex(where: { $0.id == chatId }) {
+            chats[index].newMessageFrom = nil
+        }
+
+        // 2. Firestore Remote Update (deletes field in database)
+        let convoRef = Firestore.firestore().collection("conversation").document(chatId)
+        convoRef.updateData([
+            "newMessageFrom": FieldValue.delete()
+        ]) { error in
+            if let error = error {
+                print("Error clearing newMessageFrom: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func fetchChats(username: String, isFirstLoad: Bool = true) {
         // 1. Guard against empty username or redundant loads
         guard !username.isEmpty, !isLoading && (isFirstLoad || canLoadMore) else { return }
@@ -317,7 +346,7 @@ class ChatsViewModel: ObservableObject {
         chats[index].lastMessage = text
         chats[index].lastMessagedAt = date
         chats[index].lastMessagedBy = sender
-        chats[index].newMessageFrom = sender
+        chats[index].newMessageFrom = nil
         
         // 2. Immediately re-sort the array so active conversations bubble to the top
         chats.sort { ($0.lastMessagedAt ?? .distantPast) > ($1.lastMessagedAt ?? .distantPast) }

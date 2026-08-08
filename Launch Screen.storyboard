@@ -2,7 +2,6 @@
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23504" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23506"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -23,11 +22,20 @@
                                     <constraint firstAttribute="height" constant="97" id="jYE-VS-yt4"/>
                                 </constraints>
                             </imageView>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="ls_logo" translatesAutoresizingMaskIntoConstraints="NO" id="n63-p8-4Gs">
+                                <rect key="frame" x="127" y="379" width="139" height="94"/>
+                                <constraints>
+                                    <constraint firstAttribute="height" constant="94" id="9gc-FJ-E7P"/>
+                                    <constraint firstAttribute="width" constant="139" id="K6Y-vw-AJh"/>
+                                </constraints>
+                            </imageView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
                         <color key="backgroundColor" red="0.066666666666666666" green="0.094117647058823528" blue="0.15294117647058825" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
+                            <constraint firstItem="n63-p8-4Gs" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="DmD-SK-dyh"/>
                             <constraint firstItem="YxL-el-iup" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="VSw-Rl-O0P"/>
+                            <constraint firstItem="n63-p8-4Gs" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Wl1-Ue-fct"/>
                             <constraint firstItem="YxL-el-iup" firstAttribute="top" secondItem="Bcu-3y-fUS" secondAttribute="top" constant="80" id="dOb-ix-gY3" userLabel="logo.top = Safe Area.top + 200"/>
                         </constraints>
                     </view>
@@ -38,6 +46,7 @@
         </scene>
     </scenes>
     <resources>
+        <image name="ls_logo" width="1125" height="768"/>
         <image name="universe" width="682.66668701171875" height="682.66668701171875"/>
     </resources>
 </document>

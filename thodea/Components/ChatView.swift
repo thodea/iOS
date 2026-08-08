@@ -31,7 +31,10 @@ struct ChatView: View {
     private let brandBlue = Color(red: 37/255, green: 99/255, blue: 235/255)
     private let shadowBlue = Color(red: 30/255, green: 64/255, blue: 175/255)
     
-    
+    private var hasUnreadNotification: Bool {
+        guard let newMessageFrom = chat.newMessageFrom else { return false }
+        return newMessageFrom != username
+    }
     
     private var placeholderView: some View {
         ZStack {
@@ -127,29 +130,38 @@ struct ChatView: View {
         //Color.green.edgesIgnoringSafeArea(.all)
         VStack(alignment: .leading, spacing: 2) {
             HStack(){
-                if let urlString = chat.imageURL, let url = URL(string: urlString) {
-                    KFImage(url)
-                        .placeholder {
-                            // This placeholder will ONLY show if the image isn't in cache yet
-                            ShimmerView()
-                                .frame(width: 34, height: 34)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .resizable()
-                        .fade(duration: 0.25) // Smooth transition on first fetch
-                        .scaledToFill()
-                        .frame(width: 34, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(isIncomingMessage ? brandBlue : Color.clear, lineWidth: 0.5)
-                        )
-                        .shadow(color: isIncomingMessage ? shadowBlue.opacity(0.8) : .black.opacity(0.5),
-                                radius: 3, x: 2, y: 1)
-                }  else {
-                    // Scenario 3: imageURL is nil or invalid string
-                    placeholderView
-                        .padding(.trailing, 4)
+                Group {
+                    if let urlString = chat.imageURL, let url = URL(string: urlString) {
+                        KFImage(url)
+                            .placeholder {
+                                ShimmerView()
+                                    .frame(width: 34, height: 34)
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .resizable()
+                            .fade(duration: 0.25)
+                            .scaledToFill()
+                            .frame(width: 34, height: 34)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(isIncomingMessage ? brandBlue : Color.clear, lineWidth: 0.5)
+                            )
+                            .shadow(color: isIncomingMessage ? shadowBlue.opacity(0.8) : .black.opacity(0.5),
+                                    radius: 3, x: 2, y: 1)
+                    } else {
+                        placeholderView
+                            .padding(.trailing, 4)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    if hasUnreadNotification {
+                        Circle()
+                            .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
+                            .frame(width: 8, height: 8)
+                            .offset(x: -3, y: -3)
+                            .transition(.scale.combined(with: .opacity))
+                    }
                 }
                 Text("\(chat.otherUser(currentUsername: username))")
                     .font(.system(size: 20))
