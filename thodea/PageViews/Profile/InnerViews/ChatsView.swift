@@ -62,35 +62,40 @@ struct ChatsView: View {
                 } else {
                     
                     ScrollView {
-                        VStack(spacing: 16) {
-                            // 2. Iterate over the fetched chats
-                            ForEach(chatsViewModel.chats) { chat in
+                        LazyVStack(spacing: 16) {
+                            ForEach(Array(chatsViewModel.chats.enumerated()), id: \.element.id) { index, chat in
                                 let otherUser = chat.otherUser(currentUsername: username)
                                 
-                                NavigationLink(destination: MessagesView(
-                                    username: otherUser,
-                                    miniImageData: nil,
-                                    chat: chat,
-                                    onMessageUpdated: { text, date, sender in
-                                        chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender)
+                                NavigationLink(
+                                    destination: MessagesView(
+                                        username: otherUser,
+                                        miniImageData: nil,
+                                        chat: chat,
+                                        onMessageUpdated: { text, date, sender in
+                                            chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender)
+                                        }
+                                    )
+                                    .onAppear {
+                                        // Executes ONLY when the user taps and MessagesView appears
+                                        chatsViewModel.markAsReadIfNeeded(chat: chat, currentUsername: username)
                                     }
-                                )
-                                .onAppear {
-                                    // Trigger mark-as-read reliably when entering the chat screen
-                                    chatsViewModel.markAsReadIfNeeded(chat: chat, currentUsername: username)
-                                }) {
+                                ) {
                                     ChatView(chat: chat)
+                                }
+                                .onAppear {
+                                    // Pagination threshold check on scroll
+                                    if index >= chatsViewModel.chats.count - 2,
+                                       chatsViewModel.canLoadMore,
+                                       !chatsViewModel.isLoading {
+                                        chatsViewModel.fetchChats(username: username, isFirstLoad: false)
+                                    }
                                 }
                             }
                             
-                            // 3. Optional: Pagination Loader
-                            if chatsViewModel.isLoading {
-                                ContinuousProgressView().transition(.opacity.animation(.default.delay(1)))
-                            } else if chatsViewModel.canLoadMore {
-                                Color.clear
-                                    .onAppear {
-                                        chatsViewModel.fetchChats(username: username, isFirstLoad: false)
-                                    }
+                            if chatsViewModel.isLoading && !chatsViewModel.chats.isEmpty {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                    .padding(.vertical, 8)
                             }
                         }
                         .padding()
@@ -218,31 +223,30 @@ class ChatsViewModel: ObservableObject {
     
     private var lastDocument: DocumentSnapshot?
     private let db = Firestore.firestore()
+    private let initialPageSize = 15
     private let pageSize = 5
+    private let maxChatsLimit = 100 // Hard cap requirement
     
-    // ADD THIS INITIALIZER
     init(initialChats: [Chat] = []) {
         self.chats = initialChats
-        // If we provide mocks, we usually don't want to show the 'loading' spinner immediately
         if !initialChats.isEmpty {
             self.canLoadMore = false
         }
     }
 
     func markAsReadIfNeeded(chat: Chat, currentUsername: String) {
-        // Condition: newMessageFrom is not nil and is NOT the current user
         guard let newMessageFrom = chat.newMessageFrom,
               !newMessageFrom.isEmpty,
               newMessageFrom != currentUsername,
               let chatId = chat.id,
               !chatId.isEmpty else { return }
 
-        // 1. Optimistic Local Update (instantly removes badge in UI)
+        // 1. Optimistic Local Update
         if let index = chats.firstIndex(where: { $0.id == chatId }) {
             chats[index].newMessageFrom = nil
         }
 
-        // 2. Firestore Remote Update (deletes field in database)
+        // 2. Firestore Remote Update
         let convoRef = Firestore.firestore().collection("conversation").document(chatId)
         convoRef.updateData([
             "newMessageFrom": FieldValue.delete()
@@ -254,27 +258,32 @@ class ChatsViewModel: ObservableObject {
     }
 
     func fetchChats(username: String, isFirstLoad: Bool = true) {
-        // 1. Guard against empty username or redundant loads
         guard !username.isEmpty, !isLoading && (isFirstLoad || canLoadMore) else { return }
-        
+        guard chats.count < maxChatsLimit else {
+            DispatchQueue.main.async { self.canLoadMore = false }
+            return
+        }
+         
         isLoading = true
+         
+        // Dynamically choose limit based on whether it's the initial load or a scroll pagination
+        let fetchLimit = isFirstLoad ? initialPageSize : pageSize
         
         var query = db.collection("conversation")
             .whereField("acceptedBy", arrayContains: username)
             .order(by: "lastMessagedAt", descending: true)
             .order(by: "startedBy")
-            .limit(to: pageSize)
-        
+            .limit(to: fetchLimit)
+         
         if let lastCursor = lastDocument, !isFirstLoad {
             query = query.start(afterDocument: lastCursor)
         }
 
         query.getDocuments { [weak self] snapshot, error in
             guard let self = self else { return }
-            
+             
             if let error = error {
                 print("Firestore Error: \(error.localizedDescription)")
-                // Check your console! If you see an index error, click the link provided there.
                 DispatchQueue.main.async { self.isLoading = false }
                 return
             }
@@ -282,73 +291,75 @@ class ChatsViewModel: ObservableObject {
             guard let documents = snapshot?.documents, !documents.isEmpty else {
                 DispatchQueue.main.async {
                     self.isLoading = false
-                    self.canLoadMore = false // No more data to fetch
+                    self.canLoadMore = false
                 }
                 return
             }
 
-            self.canLoadMore = documents.count == self.pageSize
+            // Check against the specific limit used for this request type
+            self.canLoadMore = documents.count == fetchLimit
             self.lastDocument = documents.last
-            
+             
             let group = DispatchGroup()
             var temporaryChats: [Chat] = []
-            
+             
             for doc in documents {
                 do {
                     var chat = try doc.data(as: Chat.self)
                     let otherUser = chat.otherUser(currentUsername: username)
-                    
-                    group.enter() // ENTER
+                     
+                    group.enter()
                     self.db.collection("user").document(otherUser).getDocument { userDoc, _ in
                         chat.imageURL = userDoc?.data()?["profileMiniUrl"] as? String
                         temporaryChats.append(chat)
-                        group.leave() // LEAVE
+                        group.leave()
                     }
                 } catch {
                     print("Mapping error for doc \(doc.documentID): \(error)")
-                    // Don't enter the group if decoding fails, or it will hang
                 }
             }
-            
+             
             group.notify(queue: .main) {
                 let sorted = temporaryChats.sorted {
                     ($0.lastMessagedAt ?? Date.distantPast) > ($1.lastMessagedAt ?? Date.distantPast)
                 }
-                
+                 
                 if isFirstLoad {
                     self.chats = sorted
                 } else {
-                    self.chats.append(contentsOf: sorted)
+                    let remainingCapacity = self.maxChatsLimit - self.chats.count
+                    let chatsToAdd = sorted.prefix(remainingCapacity)
+                    self.chats.append(contentsOf: chatsToAdd)
+                     
+                    if self.chats.count >= self.maxChatsLimit {
+                        self.canLoadMore = false
+                    }
                 }
+                 
                 self.preloadChatImages(for: sorted)
-                self.isLoading = false // FINALLY SET TO FALSE
+                self.isLoading = false
             }
         }
     }
-    /// Preheats the cache with profile images before the view even asks for them
+
     private func preloadChatImages(for chats: [Chat]) {
         let urls = chats.compactMap { chat -> URL? in
             guard let urlString = chat.imageURL else { return nil }
             return URL(string: urlString)
         }
         
-        // Kingfisher ImagePrefetcher downloads and caches images in the background
-        let prefetcher = ImagePrefetcher(urls: urls, completionHandler:  { skippedResources, failedResources, completedResources in
-            // Optional: Handle telemetry or debugging logs here
-        })
+        let prefetcher = ImagePrefetcher(urls: urls)
         prefetcher.start()
     }
     
-    func updateChatState(chatId: String, text: String, date: Date, sender: String) {        guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
+    func updateChatState(chatId: String, text: String, date: Date, sender: String) {
+        guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
         
-        // 1. Update the parent local state fields
-        // (Ensure 'lastMessage' matches the exact property name on your Chat model)
         chats[index].lastMessage = text
         chats[index].lastMessagedAt = date
         chats[index].lastMessagedBy = sender
         chats[index].newMessageFrom = nil
         
-        // 2. Immediately re-sort the array so active conversations bubble to the top
         chats.sort { ($0.lastMessagedAt ?? .distantPast) > ($1.lastMessagedAt ?? .distantPast) }
     }
 }

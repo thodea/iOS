@@ -24,7 +24,7 @@ struct FeedView: View {
                 VStack {
                     Text("")
                 }.frame(maxHeight:1)
-                //.task { await chatService.createThreeSampleConversations(currentUserId: "test")}
+                //.task { await chatService.removeTestConversations(currentUserId: "test")}
                 VStack {
                     Text("follow to customize feed")
                         .font(.headline) // Adjust font size and weight
@@ -199,3 +199,106 @@ class ChatService {
         }
     }
 }*/
+
+
+
+/*class ChatService {
+    private let db = Firestore.firestore()
+    
+    /// Creates 150 sample conversations (test_user_4 to test_user_153) for pagination testing
+    func create150SampleConversations(currentUserId: String) async {
+        let collectionRef = db.collection("conversation")
+        var batch = db.batch()
+        var operationCount = 0
+        
+        for i in 4...153 {
+            let target = "test_user_\(i)"
+            // Stagger timestamps incrementally so they sort cleanly in descending order
+            let timeOffset = Double(i * 60) // 1 minute apart per conversation
+            let messageDate = Date().addingTimeInterval(-timeOffset)
+            
+            let newChat = Chat(
+                chatUsers: [currentUserId, target],
+                startedAt: messageDate,
+                acceptedBy: [currentUserId, target],
+                allAccepted: true,
+                lastMessage: "Pagination test message #\(i)",
+                lastMessagedAt: messageDate,
+                lastMessagedBy: currentUserId,
+                newMessageFrom: currentUserId,
+                startedBy: target
+            )
+            
+            let newDocRef = collectionRef.document()
+            do {
+                try batch.setData(from: newChat, forDocument: newDocRef)
+                operationCount += 1
+                
+                // Firestore safety check: commit batches if nearing the 500 limit
+                if operationCount >= 450 {
+                    try await batch.commit()
+                    batch = db.batch()
+                    operationCount = 0
+                }
+            } catch {
+                print("Encoding error for target \(target): \(error)")
+            }
+        }
+        
+        if operationCount > 0 {
+            do {
+                try await batch.commit()
+                print("Successfully created 150 test conversations.")
+            } catch {
+                print("Batch commit failed: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Removes all test conversations except test_user_1, test_user_2, and test_user_3
+    func removeTestConversations(currentUserId: String) async {
+        let collectionRef = db.collection("conversation")
+        let protectedTargets: Set<String> = ["test_user_1", "test_user_2", "test_user_3", "nik"]
+        
+        do {
+            let snapshot = try await collectionRef
+                .whereField("acceptedBy", arrayContains: currentUserId)
+                .getDocuments()
+            
+            var batch = db.batch()
+            var deleteCount = 0
+            
+            for document in snapshot.documents {
+                do {
+                    let chat = try document.data(as: Chat.self)
+                    let otherUser = chat.otherUser(currentUsername: currentUserId)
+                    
+                    // Exclude protected users from deletion
+                    if !protectedTargets.contains(otherUser) {
+                        batch.deleteDocument(document.reference)
+                        deleteCount += 1
+                        
+                        // Respect Firestore's 500-operation batch limit
+                        if deleteCount >= 450 {
+                            try await batch.commit()
+                            batch = db.batch()
+                            deleteCount = 0
+                        }
+                    }
+                } catch {
+                    print("Error decoding document \(document.documentID): \(error)")
+                }
+            }
+            
+            if deleteCount > 0 {
+                try await batch.commit()
+                print("Successfully cleaned up test conversations (kept test_user_1, 2, and 3).")
+            } else {
+                print("No generated test conversations found to delete.")
+            }
+        } catch {
+            print("Failed to fetch or delete conversations: \(error.localizedDescription)")
+        }
+    }
+}
+*/
