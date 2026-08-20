@@ -73,6 +73,11 @@ struct ChatsView: View {
                                         chat: chat,
                                         onMessageUpdated: { text, date, sender in
                                             chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender)
+                                        },
+                                        onDelete: {
+                                            if let chatId = chat.id {
+                                                chatsViewModel.deleteChat(chatId: chatId)
+                                            }
                                         }
                                     )
                                     .onAppear {
@@ -350,6 +355,18 @@ class ChatsViewModel: ObservableObject {
         
         let prefetcher = ImagePrefetcher(urls: urls)
         prefetcher.start()
+    }
+    
+    func deleteChat(chatId: String) {
+        // 1. Local Optimistic Cleanup (instant UI removal)
+        chats.removeAll { $0.id == chatId }
+
+        // 2. Remote Firestore Deletion
+        db.collection("conversation").document(chatId).delete { error in
+            if let error = error {
+                print("Error deleting chat document: \(error.localizedDescription)")
+            }
+        }
     }
     
     func updateChatState(chatId: String, text: String, date: Date, sender: String) {

@@ -24,7 +24,7 @@ struct FeedView: View {
                 VStack {
                     Text("")
                 }.frame(maxHeight:1)
-                //.task { await chatService.removeTestConversations(currentUserId: "test")}
+                //.task { await chatService.createThreeSampleConversations(currentUserId: "nik")}
                 VStack {
                     Text("follow to customize feed")
                         .font(.headline) // Adjust font size and weight
@@ -154,7 +154,7 @@ struct mostFollowedLabel: View {
 
 
 // TESTING
-/*
+
 class ChatService {
     private let db = Firestore.firestore()
 
@@ -163,7 +163,7 @@ class ChatService {
         let collectionRef = db.collection("conversation")
         
         // Define your 3 different scenarios/users
-        let targets = ["test_user_1", "test_user_2", "test_user_3"]
+        let targets = ["test"]
         
         for target in targets {
             let newChat = Chat(
@@ -198,7 +198,7 @@ class ChatService {
             print("Batch commit failed: \(error.localizedDescription)")
         }
     }
-}*/
+}
 
 
 
