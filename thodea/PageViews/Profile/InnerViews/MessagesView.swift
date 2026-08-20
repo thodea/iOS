@@ -8,24 +8,28 @@
 
 import SwiftUI
 import Kingfisher
+import FirebaseFirestore
 
 struct MessagesView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject var chatHelper = ChatHelper()
     @State private var showDeleteOptions = false
     @State private var showDeleteConfirmation = false
+    @State private var conversationListener: ListenerRegistration?
     
     let username: String
     let miniImageData: Data?
     let chat: Chat?
     let onMessageUpdated: ((String, Date, String) -> Void)? // Added closure property
-        
+    let onDelete: (() -> Void)?
+    
     // Updated Initializer
-    init(username: String, miniImageData: Data? = nil, chat: Chat? = nil, onMessageUpdated: ((String, Date, String) -> Void)? = nil) {
+    init(username: String, miniImageData: Data? = nil, chat: Chat? = nil, onMessageUpdated: ((String, Date, String) -> Void)? = nil, onDelete: (() -> Void)? = nil) {
         self.username = username
         self.miniImageData = miniImageData
         self.chat = chat
         self.onMessageUpdated = onMessageUpdated
+        self.onDelete = onDelete
     }
     
     var body: some View {
@@ -53,6 +57,14 @@ struct MessagesView: View {
                 // No material = 100% pure color transparency, zero gray tints
                 .background(Color(red: 17/255, green: 24/255, blue: 39/255).opacity(0.7))
                 .background(.ultraThinMaterial)
+        }
+        // 2. ATTACH REAL-TIME LISTENER & CLEANUP
+        .onAppear {
+            listenForChatDeletion()
+        }
+        .onDisappear {
+            conversationListener?.remove()
+            conversationListener = nil
         }
         .toolbar {
             // Wrap both the back button and the user info in one HStack
@@ -137,7 +149,8 @@ struct MessagesView: View {
                 .confirmationDialog("Delete chat?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
                     Button("Yes", role: .destructive) {
                         // handleSpeakDelete(convoData?.id)
-                        print("Deleting...")
+                        onDelete?()
+                        presentationMode.wrappedValue.dismiss()
                     }
                     Button("No", role: .cancel) {
                         showDeleteConfirmation = false
@@ -145,6 +158,23 @@ struct MessagesView: View {
                 }
             }
         }
+    }
+    // 3. REAL-TIME DELETION LISTENER (PARITY WITH NEXT.JS onSnapshot)
+    private func listenForChatDeletion() {
+        guard let chatId = chat?.id, !chatId.isEmpty else { return }
+        
+        conversationListener = Firestore.firestore()
+            .collection("conversation")
+            .document(chatId)
+            .addSnapshotListener { snapshot, error in
+                guard let snapshot = snapshot else { return }
+                
+                // If the document was deleted remotely by the other user:
+                if !snapshot.exists {
+                    onDelete?() // Remove from local view model state if present
+                    presentationMode.wrappedValue.dismiss() // Pop back to ChatsView
+                }
+            }
     }
 }
 
