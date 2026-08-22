@@ -52,6 +52,42 @@ struct ProfileBasicView: View {
     private let followService = Follow()
     @State private var showLimitAlert = false // 🔔 For the 250 limit
     
+    // 1. Reusable Messages Button Component
+    private var messagesButton: some View {
+        ZStack(alignment: .topTrailing) {
+            NavigationLink(destination: ChatsView()) {
+                Image(systemName: "envelope")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 18)
+                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                    .padding(.trailing, 0)
+            }
+            .simultaneousGesture(TapGesture().onEnded {
+                if viewModel.currentUser?.newChat == true {
+                    viewModel.clearNewChatNotification()
+                }
+            })
+        }
+        .frame(width: 50, height: 24, alignment: .trailing)
+        .overlay(alignment: .topTrailing) {
+            if viewModel.currentUser?.newChat == true {
+                Circle()
+                    .fill(
+                        Color(
+                            red: 161 / 255,
+                            green: 98 / 255,
+                            blue: 7 / 255
+                        )
+                    )
+                    .frame(width: 10, height: 10)
+                    .offset(x: 3, y: -1.5)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+        //.border(.green, width: 1)
+    }
+
     private var hasProfileUrl: Bool {
         if isCurrentUser {
             // If it's me, check my local view model
@@ -141,32 +177,7 @@ struct ProfileBasicView: View {
                             .font(.system(size: 18, weight: .bold))
                             .frame(maxWidth: .infinity, alignment: .center)
                         
-                        ZStack(alignment: .topTrailing) {
-                            // Envelope Image Link
-                            NavigationLink(destination: ChatsView()) {
-                                Image(systemName: "envelope")
-                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
-                                    .font(.title2)
-                                    .frame(maxWidth: 50, alignment: .trailing)
-                            }
-                            // Fires exactly on touch down when the user navigates
-                            .simultaneousGesture(TapGesture().onEnded {
-                                if viewModel.currentUser?.newChat == true {
-                                    viewModel.clearNewChatNotification()
-                                }
-                            })
-                            
-                            // Orange Notification Circle at top-right corner
-                            if viewModel.currentUser?.newChat == true {
-                                Circle()
-                                    .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
-                                    .frame(width: 10, height: 10)
-                                    .offset(x: 2, y: -2)
-                                    // Added cross-view transition animation support
-                                    .transition(.scale.combined(with: .opacity))
-                            }
-                        }
-                        .frame(width: 50, height: 24)// Adjust position if needed
+                        messagesButton
                     }
                     .frame(maxWidth: .infinity, maxHeight: 30, alignment: .leading)
                     //.border(.gray, width: 4)
@@ -588,8 +599,10 @@ struct ProfileBasicView: View {
                             .font(.system(size: 18, weight: .bold))
                     }
                         
-                    if !isCurrentUser {
-                        ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        if isCurrentUser {
+                            messagesButton
+                        } else {
                             NavigationLink(destination: MessagesView(username: username, miniImageData: miniImageData)) {
                                 Image(systemName: "paperplane.fill")
                                     .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))

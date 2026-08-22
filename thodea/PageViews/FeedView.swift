@@ -10,6 +10,7 @@ import Firebase
 import FirebaseFirestore
 
 struct FeedView: View {
+    @StateObject private var vm = FeedViewModel()
 
     /*init() {
 
@@ -17,6 +18,7 @@ struct FeedView: View {
     //private let chatService = ChatService()
     
     var body: some View {
+        
         ScrollView { // Wrap the content in a ScrollView
             
             VStack(spacing: 0) {
@@ -45,11 +47,34 @@ struct FeedView: View {
                 //Text(\(username))
                 
                 monthlyLovedLabel().padding(.bottom, 6).padding(.top, 6)
-                mostFollowedLabel().padding(.bottom, 6).padding(.top, 6)
                 
+                // 🔹 MOST FOLLOWED SECTION
+                if !vm.mostFollowedUsers.isEmpty {
+                    mostFollowedLabel().padding(.bottom, 6).padding(.top, 6)
+                    LazyVStack(spacing: 8) {
+                        ForEach(vm.mostFollowedUsers, id: \.username) { userInfo in
+                            let isDeleted = userInfo.deleted ?? false
+                            
+                            NavigationLink(destination: ProfileUserView(username: userInfo.username)) {
+                                UserRowView(userInfo: userInfo, dateDisabled: true)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .disabled(isDeleted)
+                            .opacity(isDeleted ? 0.6 : 1.0)
+                            .padding(.bottom, 4)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 6)
+                    .padding(.bottom, 24)
+                }
+
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            await vm.fetchMostFollowedUsers()
+        }
         // Ensure the ScrollView covers the full scree
         //.border(Color.red, width: 2) // To see the frame edges clearly
     }

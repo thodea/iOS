@@ -381,11 +381,11 @@ struct UserRowView: View {
                 HStack(alignment: .center, spacing: 6) {
                     Text(userInfo.username)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                        .foregroundColor(.white.opacity(0.9))
                     Text("|").font(.system(size: 16)).opacity(0.45)
                     Text(formatNumber(userInfo.thoughts ?? 0)) // Simplified format for brevity
                         .font(.system(size: 16))
-                        .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                        .foregroundColor(.white.opacity(0.9))
                 }
                 
                 Spacer()
