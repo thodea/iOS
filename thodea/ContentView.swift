@@ -21,12 +21,22 @@ struct ContentView: View {
                             if authViewModel.isLoadingUser {
                                 Loader()
                             } else {
-                                switch selectedNavItem {
-                                case "post": PostView(selectedNavItem: $selectedNavItem)
-                                case "feed": FeedView()
-                                case "search": SearchView()
-                                case "profile": ProfileView()
-                                default: FeedView()
+                                ZStack {
+                                    FeedView()
+                                        .opacity(selectedNavItem == "feed" || selectedNavItem == "login" ? 1 : 0)
+                                        .allowsHitTesting(selectedNavItem == "feed" || selectedNavItem == "login")
+                                    
+                                    PostView(selectedNavItem: $selectedNavItem)
+                                        .opacity(selectedNavItem == "post" ? 1 : 0)
+                                        .allowsHitTesting(selectedNavItem == "post")
+                                    
+                                    SearchView()
+                                        .opacity(selectedNavItem == "search" ? 1 : 0)
+                                        .allowsHitTesting(selectedNavItem == "search")
+                                    
+                                    ProfileView()
+                                        .opacity(selectedNavItem == "profile" ? 1 : 0)
+                                        .allowsHitTesting(selectedNavItem == "profile")
                                 }
                             }
                         }
