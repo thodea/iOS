@@ -79,6 +79,9 @@ struct ContentView: View {
                     selectedNavItem = "login"
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToSearchTab"))) { _ in
+                    selectedNavItem = "search"
+                }
         }
         .overlay {
             // This assumes you have 'isUploading' and 'isDeleting' properties

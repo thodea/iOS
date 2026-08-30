@@ -14,53 +14,66 @@ struct ChatsView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var chatsViewModel = ChatsViewModel()
     @EnvironmentObject var authViewModel: AuthViewModel // Add this
+        
+    var onNavigateToSearch: (() -> Void)? = nil
     
     var username: String {
         authViewModel.currentUser?.username ?? ""
     }
     
-    // This initializer handles both Production and Preview
-    init(previewVM: ChatsViewModel? = nil) {
+    // Initializer supports both Production, Preview, and optional action callback
+    init(previewVM: ChatsViewModel? = nil, onNavigateToSearch: (() -> Void)? = nil) {
         _chatsViewModel = StateObject(wrappedValue: previewVM ?? ChatsViewModel())
+        self.onNavigateToSearch = onNavigateToSearch
     }
     
     var body: some View {
-            ZStack {
+        ZStack {
                 // Main App Background
                 Color(red: 17/255, green: 24/255, blue: 39/255)
                     .ignoresSafeArea()
-                /*VStack(spacing: 16) {
-                 // Search TextField
-                 /*HStack(){
-                  Text("chats")
-                  }.frame(maxWidth: .infinity, alignment: .leading).padding(.top, 8).font(.system(size: 19)).foregroundColor(.white.opacity(0.6))*/
-                 
-                 
-                 
-                 /* NavigationLink(destination: MessagesView(username: mockUser.username, miniImageData: nil)) {
-                  ChatView(chat: mockThought)
-                  }
-                  
-                  ChatView(chat: mockThought)*/
-                 
-                 Spacer()
-                 
-                 }*/
                 
                 // Conditional State Handling
-                if chatsViewModel.chats.isEmpty && chatsViewModel.isLoading {
-                    // 1. SHOW INITIAL LOADER (0.2 Opacity Gray Progress View)
-                    VStack {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .gray))
-                            .opacity(0.2)
-                            .scaleEffect(1.5)
-                            .padding(.top, 24) // Adjust this value to get the perfect spacing from your nav bar
-                        
-                        Spacer() // Crucial: Pushes everything above it to the top of the screen
+                if chatsViewModel.chats.isEmpty {
+                    if chatsViewModel.isLoading {
+                        // 1. SHOW INITIAL LOADER
+                        VStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                                .opacity(0.2)
+                                .scaleEffect(1.5)
+                                .padding(.top, 24)
+                            
+                            Spacer()
+                        }
+                    } else {
+                        // 2. FALLBACK DISPLAY (0 Chats & Not Loading)
+                        VStack {
+                            HStack(spacing: 6) {
+                                Button(action: {
+                                    presentationMode.wrappedValue.dismiss()
+                                    NotificationCenter.default.post(name: Notification.Name("SwitchToSearchTab"), object: nil)
+                                    onNavigateToSearch?()
+                                }) {
+                                    Text("Search users")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(Color(red: 29/255, green: 78/255, blue: 216/255))
+                                        .underline()
+                                }
+                                
+                                Text("to start new chat")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 24)
+                            
+                            Spacer()
+                        }
                     }
                 } else {
-                    
+                    // 3. SHOW CHATS LIST
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(Array(chatsViewModel.chats.enumerated()), id: \.element.id) { index, chat in
@@ -81,14 +94,12 @@ struct ChatsView: View {
                                         }
                                     )
                                     .onAppear {
-                                        // Executes ONLY when the user taps and MessagesView appears
                                         chatsViewModel.markAsReadIfNeeded(chat: chat, currentUsername: username)
                                     }
                                 ) {
                                     ChatView(chat: chat)
                                 }
                                 .onAppear {
-                                    // Pagination threshold check on scroll
                                     if index >= chatsViewModel.chats.count - 2,
                                        chatsViewModel.canLoadMore,
                                        !chatsViewModel.isLoading {

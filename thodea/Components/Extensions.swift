@@ -272,3 +272,28 @@ extension View {
         }
     }
 }
+
+func startConversation(with targetUsername: String, currentUsername: String) async -> String? {
+    let chatUsers = [targetUsername, currentUsername].sorted()
+    let db = Firestore.firestore()
+    
+    do {
+        let snapshot = try await db.collection("conversation")
+            .whereField("chatUsers", isEqualTo: chatUsers)
+            .getDocuments()
+        
+        if let existingDoc = snapshot.documents.first {
+            return existingDoc.documentID
+        } else {
+            let newDocRef = try await db.collection("conversation").addDocument(data: [
+                "chatUsers": chatUsers,
+                "startedAt": Date(),
+                "empty": true
+            ])
+            return newDocRef.documentID
+        }
+    } catch {
+        print("Error starting conversation: \(error.localizedDescription)")
+        return nil
+    }
+}
