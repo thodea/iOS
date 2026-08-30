@@ -52,6 +52,10 @@ struct ProfileBasicView: View {
     private let followService = Follow()
     @State private var showLimitAlert = false // 🔔 For the 250 limit
     
+    @State private var activeChatId: String? = nil
+    @State private var isNavigatingToChat: Bool = false
+    @State private var isStartingChat: Bool = false
+    
     // 1. Reusable Messages Button Component
     private var messagesButton: some View {
         ZStack(alignment: .topTrailing) {
@@ -603,13 +607,39 @@ struct ProfileBasicView: View {
                         if isCurrentUser {
                             messagesButton
                         } else {
-                            NavigationLink(destination: MessagesView(username: username, miniImageData: miniImageData)) {
+                           /* NavigationLink(destination: MessagesView(username: username, miniImageData: miniImageData)) {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
+                                    .font(.title2)
+                                    .scaleEffect(0.8)
+                                    .frame(maxWidth: 50, alignment: .trailing)
+                            }*/
+                 
+                            
+                            
+                            Button {
+                                guard let currentUsername = viewModel.currentUser?.username else { return }
+                                isStartingChat = true
+                                
+                                Task {
+                                    if let convoId = await startConversation(with: username, currentUsername: currentUsername) {
+                                        await MainActor.run {
+                                            self.activeChatId = convoId
+                                            self.isStartingChat = false
+                                            self.isNavigatingToChat = true
+                                        }
+                                    } else {
+                                        await MainActor.run { isStartingChat = false }
+                                    }
+                                }
+                            } label: {
                                 Image(systemName: "paperplane.fill")
                                     .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
                                     .font(.title2)
                                     .scaleEffect(0.8)
                                     .frame(maxWidth: 50, alignment: .trailing)
                             }
+                            .disabled(isStartingChat)
                         }
                     }
                 }
@@ -620,6 +650,26 @@ struct ProfileBasicView: View {
                     viewModel.listenToCurrentUser()
                 }
             }
+        }
+        .navigationDestination(isPresented: $isNavigatingToChat) {
+            MessagesView(
+                username: username,
+                chat: Chat(
+                    id: activeChatId,
+                    chatUsers: [viewModel.currentUser?.username ?? "", username],
+                    startedAt: Date(),
+                    imageURL: fetchedUser?.profileMiniUrl
+                ),
+                onDelete: {
+                    if let chatId = activeChatId {
+                        // 1. Perform actual backend/Firestore deletion
+                        ChatsViewModel().deleteChat(chatId: chatId) // Or your shared ChatService.deleteChat(chatId: chatId)
+                    }
+                    // 2. Clear local active state
+                    activeChatId = nil
+                    //isNavigatingToChat = false
+                }
+            )
         }
     }
     

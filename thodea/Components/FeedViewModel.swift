@@ -24,7 +24,7 @@ final class FeedViewModel: ObservableObject {
         let rtdbRef = Database.database().reference()
             .child("user")
             .queryOrdered(byChild: "followers")
-            .queryLimited(toFirst: 20)
+            .queryLimited(toFirst: 10)
         
         do {
             let snapshot = try await rtdbRef.getData()
