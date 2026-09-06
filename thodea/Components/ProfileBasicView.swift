@@ -85,6 +85,7 @@ struct ProfileBasicView: View {
                         )
                     )
                     .frame(width: 10, height: 10)
+                    .shadow(color: .black.opacity(0.4), radius: 1.5, x: 0, y: 1)
                     .offset(x: 3, y: -1.5)
                     .transition(.scale.combined(with: .opacity))
             }
