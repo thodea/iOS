@@ -60,6 +60,10 @@ struct UserChatView: View {
                 .padding(.horizontal, 16)
         }
         .background(Color(red: 17/255, green: 24/255, blue: 39/255))
+        .onAppear {
+            let currentUser = viewModel.currentUser?.username ?? ""
+            chatViewModel.startConvoListener(currentUsername: currentUser)
+        }
         .onChange(of: chatViewModel.realTimeMessages) { _, newMessages in
             if let latestMessage = newMessages.last {
                 // Safely extract text, date, and sender data elements
@@ -137,6 +141,7 @@ struct UserChatView: View {
                 }
             }
         }
+        //.border(.red, width: 2)
     }
 
     private var messageList: some View {
@@ -158,8 +163,10 @@ struct UserChatView: View {
                     }
                 ),
                 onDelete: {
-                    Task {
-                        await chatViewModel.deleteMessage(id: msg.id, userName: currentUser, msg: msg)
+                    if !chatViewModel.requestPendingError {
+                        Task {
+                            await chatViewModel.deleteMessage(id: msg.id, userName: currentUser, msg: msg)
+                        }
                     }
                 },
                 attachedImage: (msg.assetType?.hasPrefix("image") ?? false) ? msg.assetUrl : nil,
@@ -208,129 +215,141 @@ struct UserChatView: View {
                     .transition(.opacity)
             }
     
-            mediaPreview
+            // ---> NEW LOGIC: Lock Input when chat request is pending
+            if chatViewModel.requestPendingError {
+                Text("Chat request sent")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color(red: 252/255, green: 165/255, blue: 165/255)) // Next.js text-red-300
+                    .frame(maxWidth: .infinity, maxHeight: 20, alignment: .bottom)
+                    .padding(.top, 16)   // Space separating it from the chat bubbles above
+                    .padding(.bottom, 0) // Explicitly zero bottom padding
+                    //.border(.green, width: 2)
+            } else {
+                // ---> EXISTING INPUT LOGIC (Wrapped in the `else` block)
+                mediaPreview
 
-            HStack(alignment: .bottom, spacing: 0) {
-                // Photo/Video Button
-                if selectedImage == nil && selectedVideoURL == nil {
-                    PhotosPicker(selection: $selectedItem, matching: .any(of: [.images, .videos])) {
-                        Image(systemName: "photo.artframe")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 26, height: 26)
-                            .padding(.bottom, 3)
-                            .foregroundColor(.blue)
-                    }
-                    .onChange(of: selectedItem) { _, newItem in
-                        Task {
-                            await handleMediaSelection(newItem)
+                HStack(alignment: .bottom, spacing: 0) {
+                    // Photo/Video Button
+                    if selectedImage == nil && selectedVideoURL == nil {
+                        PhotosPicker(selection: $selectedItem, matching: .any(of: [.images, .videos])) {
+                            Image(systemName: "photo.artframe")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 26, height: 26)
+                                .padding(.bottom, 3)
+                                .foregroundColor(.blue)
                         }
-                    }
-                    .padding(.trailing, 4)
-                } 
-                
-                TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.gray), axis: .vertical)
-                    .lineLimit(1...6)
-                    .textFieldStyle(.plain)
-                    .frame(minHeight: 32)
-                    .foregroundColor(.white)
-                    .font(.system(size: 22))
-                    .padding(.leading, 4)
-                    .overlay(Rectangle().frame(height: 2).foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)), alignment: .bottom)
-                    .onChange(of: typingMessage) { _, newValue in
-                                        handleTextChange(newValue)
-                                    }
-                
-                let currentUser = viewModel.currentUser?.username ?? ""
-                
-                Button(action: {
-                    // 1. Bridge the synchronous button action to Swift Concurrency
-                    Task {
-                        do {
-                            let messageId = chatViewModel.generateMessageId()
-                            var finalAssetUrl: String? = nil
-                            var assetFileType: String? = nil
-                            var bunnyVideoId: String? = nil // <--- ADD THIS
-                            var posterUrl: String? = nil    // <--- ADD THIS
-                            
-                            // 1. If an image is selected, process and upload it first
-                            if let uiImage = selectedImage {
-                                viewModel.isUploading = true
-                                guard let compressedData = uiImage.jpegData(compressionQuality: 0.80) else {
-                                    print("🔥 Image compression failed.")
-                                    return
-                                }
-                                let timestamp = Int(Date().timeIntervalSince1970 * 1000)
-
-                                let ext = "jpg"
-                                let path = "conversation/\(chatId)/messages/\(messageId)/asset\(timestamp).\(ext)"
-                                
-                                // Await the safe background upload thread
-                                finalAssetUrl = try await bunnyService.uploadImage(
-                                    data: compressedData,
-                                    username: currentUser,
-                                    fileExtension: ext,
-                                    path: path
-                                )
-                                assetFileType = "image/\(ext)"
-                            } else if let videoURL = selectedVideoURL {
-                                // --- NEW VIDEO UPLOAD INTEGRATION ROUTE ---
-                                viewModel.isUploading = true
-                                
-                                // Upload utilizing the local sandbox path provided by your Transferable struct
-                                if let videoMeta = try await bunnyService.uploadVideo(fileURL: videoURL, collectionName: chatId) {
-                                    finalAssetUrl = videoMeta.cdnUrl // The direct .m3u8 index stream route
-                                    let ext = videoURL.pathExtension.lowercased()
-                                    assetFileType = "video/\(ext == "mov" ? "mp4" : ext)"
-                                        
-                                    // Extracting the identical keys matching your Next.js state structure
-                                    bunnyVideoId = videoMeta.videoId
-                                    
-                                    // Replace string below with your production Bunny Stream Pull Zone configuration domain
-                                    let streamPullZone = AppConfig.streamPullZone
-                                    posterUrl = "https://\(streamPullZone)/\(videoMeta.videoId)/thumbnail.jpg"
-                                }
+                        .onChange(of: selectedItem) { _, newItem in
+                            Task {
+                                await handleMediaSelection(newItem)
                             }
-                            
-                            // 2. Pass any resolved endpoints into the structural firestore payload
-                            try await chatViewModel.sendMessage(
-                                messageId: messageId,
-                                input: typingMessage,
-                                userName: currentUser,
-                                assetUrl: finalAssetUrl,
-                                assetType: assetFileType,
-                                bunnyVideoId: bunnyVideoId, // <--- ADD THIS
-                                posterUrl: posterUrl,
-                                chat: chat
-                            )
-                            
-                            // 3. UI Cleanup on Main Actor upon successful delivery
-                            typingMessage = ""
-                            selectedImage = nil
-                            selectedVideoURL = nil  // <-- ADD THIS TO RESET PREVIEW
-                            selectedItem = nil
-                            bunnyService.progress = 0.0
-                            bunnyService.isUploading = false
-                            viewModel.isUploading = false
-                            
-                        } catch {
-                            await MainActor.run {
+                        }
+                        .padding(.trailing, 4)
+                    }
+                    
+                    TextField("Message", text: $typingMessage, prompt: Text("Message").foregroundColor(.gray), axis: .vertical)
+                        .lineLimit(1...6)
+                        .textFieldStyle(.plain)
+                        .frame(minHeight: 32)
+                        .foregroundColor(.white)
+                        .font(.system(size: 22))
+                        .padding(.leading, 4)
+                        .overlay(Rectangle().frame(height: 2).foregroundColor(Color(red: 30/255, green: 58/255, blue: 138/255)), alignment: .bottom)
+                        .onChange(of: typingMessage) { _, newValue in
+                                            handleTextChange(newValue)
+                                        }
+                    
+                    let currentUser = viewModel.currentUser?.username ?? ""
+                    
+                    Button(action: {
+                        // 1. Bridge the synchronous button action to Swift Concurrency
+                        Task {
+                            do {
+                                let messageId = chatViewModel.generateMessageId()
+                                var finalAssetUrl: String? = nil
+                                var assetFileType: String? = nil
+                                var bunnyVideoId: String? = nil // <--- ADD THIS
+                                var posterUrl: String? = nil    // <--- ADD THIS
+                                
+                                // 1. If an image is selected, process and upload it first
+                                if let uiImage = selectedImage {
+                                    viewModel.isUploading = true
+                                    guard let compressedData = uiImage.jpegData(compressionQuality: 0.80) else {
+                                        print("🔥 Image compression failed.")
+                                        return
+                                    }
+                                    let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+
+                                    let ext = "jpg"
+                                    let path = "conversation/\(chatId)/messages/\(messageId)/asset\(timestamp).\(ext)"
+                                    
+                                    // Await the safe background upload thread
+                                    finalAssetUrl = try await bunnyService.uploadImage(
+                                        data: compressedData,
+                                        username: currentUser,
+                                        fileExtension: ext,
+                                        path: path
+                                    )
+                                    assetFileType = "image/\(ext)"
+                                } else if let videoURL = selectedVideoURL {
+                                    // --- NEW VIDEO UPLOAD INTEGRATION ROUTE ---
+                                    viewModel.isUploading = true
+                                    
+                                    // Upload utilizing the local sandbox path provided by your Transferable struct
+                                    if let videoMeta = try await bunnyService.uploadVideo(fileURL: videoURL, collectionName: chatId) {
+                                        finalAssetUrl = videoMeta.cdnUrl // The direct .m3u8 index stream route
+                                        let ext = videoURL.pathExtension.lowercased()
+                                        assetFileType = "video/\(ext == "mov" ? "mp4" : ext)"
+                                            
+                                        // Extracting the identical keys matching your Next.js state structure
+                                        bunnyVideoId = videoMeta.videoId
+                                        
+                                        // Replace string below with your production Bunny Stream Pull Zone configuration domain
+                                        let streamPullZone = AppConfig.streamPullZone
+                                        posterUrl = "https://\(streamPullZone)/\(videoMeta.videoId)/thumbnail.jpg"
+                                    }
+                                }
+                                
+                                // 2. Pass any resolved endpoints into the structural firestore payload
+                                try await chatViewModel.sendMessage(
+                                    messageId: messageId,
+                                    input: typingMessage,
+                                    userName: currentUser,
+                                    assetUrl: finalAssetUrl,
+                                    assetType: assetFileType,
+                                    bunnyVideoId: bunnyVideoId, // <--- ADD THIS
+                                    posterUrl: posterUrl,
+                                    chat: chat
+                                )
+                                
+                                // 3. UI Cleanup on Main Actor upon successful delivery
+                                typingMessage = ""
+                                selectedImage = nil
+                                selectedVideoURL = nil  // <-- ADD THIS TO RESET PREVIEW
+                                selectedItem = nil
                                 bunnyService.progress = 0.0
                                 bunnyService.isUploading = false
                                 viewModel.isUploading = false
-                                print("🔥 [Chat View Error] Could not send message: \(error.localizedDescription)")
+                                
+                            } catch {
+                                await MainActor.run {
+                                    bunnyService.progress = 0.0
+                                    bunnyService.isUploading = false
+                                    viewModel.isUploading = false
+                                    print("🔥 [Chat View Error] Could not send message: \(error.localizedDescription)")
+                                }
                             }
                         }
+                    }) {
+                        Image(systemName: "paperplane.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28, height: 28)
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 10)
                     }
-                }) {
-                    Image(systemName: "paperplane.fill")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .foregroundColor(.gray)
-                        .padding(.horizontal, 10)
+                    .disabled(isSendDisabled)
                 }
-                .disabled(isSendDisabled)
             }
         }
     }
@@ -656,6 +675,8 @@ struct UserChatView_Previews: PreviewProvider {
 }
 
 class ChatViewModel: ObservableObject {
+    @Published var requestPendingError: Bool = false
+    private var convoListener: ListenerRegistration?
     @Published var realTimeMessages: [Message] = []
     @Published var isLoading: Bool = true
     
@@ -712,6 +733,26 @@ class ChatViewModel: ObservableObject {
                     // 3. Compare raw counts vs parsed counts
                     //print("✅ [UI Update] Successfully loaded \(self?.realTimeMessages.count ?? 0) / \(documents.count) messages into state.")
                     self?.isLoading = false
+                }
+            }
+    }
+    
+    func startConvoListener(currentUsername: String) {
+        convoListener = db.collection("conversation")
+            .document(chatId)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let data = snapshot?.data() else { return }
+                
+                let allAccepted = data["allAccepted"] as? Bool ?? true
+                let startedBy = data["startedBy"] as? String ?? ""
+                
+                DispatchQueue.main.async {
+                    // Next.js equivalent: convoData?.allAccepted == false && convoData?.startedBy == userName!
+                    if allAccepted == false && startedBy == currentUsername {
+                        self?.requestPendingError = true
+                    } else {
+                        self?.requestPendingError = false
+                    }
                 }
             }
     }
@@ -903,6 +944,7 @@ class ChatViewModel: ObservableObject {
     deinit {
         // Clean up subscription natively when view leaves memory
         listener?.remove()
+        convoListener?.remove()
     }
     
     func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil, bunnyVideoId: String? = nil, posterUrl: String? = nil, chat: Chat? = nil
@@ -939,7 +981,7 @@ class ChatViewModel: ObservableObject {
             messageData["posterUrl"] = posterUrl
         }
 
-        let conversationUpdateData: [String: Any] = [
+        var conversationUpdateData: [String: Any] = [
             "lastMessage": input,
             "lastMessagedAt": now,
             "lastMessagedBy": userName,
@@ -947,28 +989,50 @@ class ChatViewModel: ObservableObject {
         ]
         
         // 3. Atomic Batch Write (The Next.js Equivalent)
+        // 3. Atomic Batch Write (The Next.js Equivalent)
         let batch = db.batch()
-        
-        // Set the new message data
         batch.setData(messageData, forDocument: newMessageDocRef)
         
-        // Update the parent conversation fields (merges seamlessly, like updateDoc)
-        batch.updateData(conversationUpdateData, forDocument: conversationDocRef)
-        
         if let chat = chat {
-            let isConditionOne = (chat.allAccepted == false && chat.startedBy != userName)
-            let isConditionTwo = (chat.allAccepted == true)
+            let otherTargetUser = chat.otherUser(currentUsername: userName)
             
-            if isConditionOne || isConditionTwo {
-                // Find the other user using your model's helper function
-                let otherTargetUser = chat.otherUser(currentUsername: userName)
+            // Condition 1: Initializing a New Chat (startedBy is not set yet)
+            if chat.startedBy == nil || chat.startedBy?.isEmpty == true {
+                conversationUpdateData["allAccepted"] = false
+                conversationUpdateData["startedBy"] = userName
+                conversationUpdateData["acceptedBy"] = [userName]
+                conversationUpdateData["empty"] = FieldValue.delete() // Optional: Mirroring Next.js empty: deleteField()
+                
+                if otherTargetUser != "~unknown" {
+                    let userDocRef = db.collection("user").document(otherTargetUser)
+                    batch.updateData(["chatRequest": true], forDocument: userDocRef)
+                }
+            }
+            // Condition 2: Accepting a chat request (started by the other user)
+            else if chat.allAccepted == false && chat.startedBy != userName {
+                conversationUpdateData["allAccepted"] = true
+                if let originalStarter = chat.startedBy {
+                    conversationUpdateData["acceptedBy"] = [userName, originalStarter]
+                } else {
+                    conversationUpdateData["acceptedBy"] = [userName]
+                }
                 
                 if otherTargetUser != "~unknown" {
                     let userDocRef = db.collection("user").document(otherTargetUser)
                     batch.updateData(["newChat": true], forDocument: userDocRef)
                 }
             }
+            // Condition 3: Normal Ongoing Chat
+            else if chat.allAccepted == true {
+                if otherTargetUser != "~unknown" {
+                    let userDocRef = db.collection("user").document(otherTargetUser)
+                    batch.updateData(["newChat": true], forDocument: userDocRef)
+                }
+            }
         }
+        
+        // Update the parent conversation fields
+        batch.updateData(conversationUpdateData, forDocument: conversationDocRef)
     
         // Commit the batch atomically
         try await batch.commit()
