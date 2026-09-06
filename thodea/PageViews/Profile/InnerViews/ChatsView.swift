@@ -149,7 +149,22 @@ struct ChatsView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(Color(red: 29/255, green: 78/255, blue: 216/255), lineWidth: 2)
                             )
+                            .overlay(alignment: .topTrailing) {
+                                if authViewModel.currentUser?.chatRequest == true { // 👈 Pointer 1: Update this condition
+                                    Circle()
+                                        .fill(Color(red: 161 / 255, green: 98 / 255, blue: 7 / 255))
+                                        .frame(width: 10, height: 10)
+                                        .shadow(color: .black.opacity(0.4), radius: 1.5, x: 0, y: 1) 
+                                        .offset(x: 4, y: -5) // 👈 Pointer 2: Tweak for corner radius
+                                        .transition(.scale.combined(with: .opacity))
+                                }
+                            }
                     }
+                    .simultaneousGesture(TapGesture().onEnded {
+                       if authViewModel.currentUser?.chatRequest == true {
+                           authViewModel.clearChatRequestNotification()
+                       }
+                   })
                 }
             }
            

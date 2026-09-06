@@ -78,6 +78,9 @@ class AuthViewModel: ObservableObject {
                     if let followingValue = data["following"] as? [String] {
                         self.currentUser?.following = followingValue
                     }
+                    if let chatRequestValue = data["chatRequest"] as? Bool {
+                        self.currentUser?.chatRequest = chatRequestValue
+                    }
                 }
             }
     }
@@ -93,6 +96,20 @@ class AuthViewModel: ObservableObject {
         db.collection("user").document(username).updateData(["newChat": false]) { error in
             if let error = error {
                 Logger().error("Failed to clear newChat flag in cloud: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    func clearChatRequestNotification() {
+        guard let username = currentUser?.username else { return }
+        
+        // 1. Optimistic UI update for immediate visual feedback
+        self.currentUser?.chatRequest = false
+        
+        // 2. Persist mutation safely back to database
+        db.collection("user").document(username).updateData(["chatRequest": false]) { error in
+            if let error = error {
+                Logger().error("Failed to clear chatRequest flag in cloud: \(error.localizedDescription)")
             }
         }
     }
