@@ -10,6 +10,11 @@ import SwiftUI
 import FirebaseFirestore
 import Kingfisher
 
+enum ChatFetchMode {
+    case chats
+    case requests
+}
+
 struct ChatsView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var chatsViewModel = ChatsViewModel()
@@ -85,7 +90,7 @@ struct ChatsView: View {
                                         miniImageData: nil,
                                         chat: chat,
                                         onMessageUpdated: { text, date, sender in
-                                            chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender)
+                                            chatsViewModel.updateChatState(chatId: chat.id ?? "", text: text, date: date, sender: sender, currentUsername: username)
                                         },
                                         onDelete: {
                                             if let chatId = chat.id {
@@ -252,14 +257,17 @@ class ChatsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var canLoadMore = true
     
+    let mode: ChatFetchMode
+    
     private var lastDocument: DocumentSnapshot?
     private let db = Firestore.firestore()
     private let initialPageSize = 15
     private let pageSize = 5
     private let maxChatsLimit = 100 // Hard cap requirement
     
-    init(initialChats: [Chat] = []) {
+    init(initialChats: [Chat] = [], mode: ChatFetchMode = .chats) { // 👈 Update initializer
         self.chats = initialChats
+        self.mode = mode
         if !initialChats.isEmpty {
             self.canLoadMore = false
         }
@@ -300,15 +308,33 @@ class ChatsViewModel: ObservableObject {
         // Dynamically choose limit based on whether it's the initial load or a scroll pagination
         let fetchLimit = isFirstLoad ? initialPageSize : pageSize
         
-        var query = db.collection("conversation")
+       /* var query = db.collection("conversation")
             .whereField("acceptedBy", arrayContains: username)
             .order(by: "lastMessagedAt", descending: true)
             .order(by: "startedBy")
-            .limit(to: fetchLimit)
+            .limit(to: fetchLimit)*/
+        
+        var query: Query = db.collection("conversation")
+
+        if mode == .chats {
+            query = query
+                .whereField("acceptedBy", arrayContains: username)
+                .order(by: "lastMessagedAt", descending: true)
+                .order(by: "startedBy")
+        } else {
+            // Parity with Next.js: chatUsers contains you, allAccepted == false, sorted by date
+            query = query
+                .whereField("chatUsers", arrayContains: username)
+                .whereField("startedBy", isNotEqualTo: username)
+                .whereField("allAccepted", isEqualTo: false)
+                .order(by: "lastMessagedAt", descending: true)
+        }
          
         if let lastCursor = lastDocument, !isFirstLoad {
             query = query.start(afterDocument: lastCursor)
         }
+        
+        query = query.limit(to: fetchLimit)
 
         query.getDocuments { [weak self] snapshot, error in
             guard let self = self else { return }
@@ -337,6 +363,11 @@ class ChatsViewModel: ObservableObject {
             for doc in documents {
                 do {
                     var chat = try doc.data(as: Chat.self)
+                    
+                    if self.mode == .requests && chat.startedBy == username {
+                        continue
+                    }
+            
                     let otherUser = chat.otherUser(currentUsername: username)
                      
                     group.enter()
@@ -395,9 +426,16 @@ class ChatsViewModel: ObservableObject {
         }
     }
     
-    func updateChatState(chatId: String, text: String, date: Date, sender: String) {
+    func updateChatState(chatId: String, text: String, date: Date, sender: String, currentUsername: String) {
         guard let index = chats.firstIndex(where: { $0.id == chatId }) else { return }
-        
+            
+        if mode == .requests && sender == currentUsername {
+            withAnimation {
+                _ = chats.remove(at: index)
+            }
+            return
+        }
+    
         chats[index].lastMessage = text
         chats[index].lastMessagedAt = date
         chats[index].lastMessagedBy = sender
