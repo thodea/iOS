@@ -22,7 +22,7 @@ class FollowListViewModel: ObservableObject {
     private var lastDocument: DocumentSnapshot? = nil
     private let service = FollowService()
     private let cache = FollowCache.shared
-    private let pageSize = 4 // As requested
+    private let pageSize = 10 // As requested
     private let maxHardLimit = 250 // 🎯 The Hard Limit
     
     // 1️⃣ Add Init to subscribe to the notification
@@ -114,10 +114,11 @@ class FollowListViewModel: ObservableObject {
     }
     
     func loadMore(username: String, listType: String) async {
-        guard !isLoadingMore, hasMore, !isLoadingInitial, users.count < maxHardLimit else {
-            self.hasMore = false
-            return
-        }
+        guard !isLoadingMore, !isLoadingInitial else { return }
+        guard hasMore, users.count < maxHardLimit else {
+                self.hasMore = false
+                return
+            }
         isLoadingMore = true
         print("⚡️ Triggering Load More...")
 
@@ -154,6 +155,7 @@ class FollowListViewModel: ObservableObject {
             
         } catch {
             print("❌ Load more error:", error)
+            self.hasMore = false
         }
         
         isLoadingMore = false
@@ -240,7 +242,18 @@ struct FollowsView: View {
                                 .onAppear {
                                     // Trigger load when the user sees the 3rd to last item
                                     // This creates a "smooth" infinite scroll effect
-                                    if index == vm.users.count - 1 && vm.hasMore {
+                                    /*if index == vm.users.count - 1 && vm.hasMore {
+                                        Task {
+                                            await vm.loadMore(username: username, listType: listType)
+                                        }
+                                    }*/
+                                    // 1. Calculate threshold (Since pageSize is 4, 2 items before the end is halfway)
+                                    // If you ever increase pageSize to 20, you could change this to something like 10.
+                                    let prefetchThreshold = max(0, vm.users.count - 5)
+                                    
+                                    // 2. Use >= to ensure we catch fast scrolls.
+                                    // Duplicate calls are now safely caught by the updated guard statement in the ViewModel.
+                                    if index >= prefetchThreshold && vm.hasMore {
                                         Task {
                                             await vm.loadMore(username: username, listType: listType)
                                         }
