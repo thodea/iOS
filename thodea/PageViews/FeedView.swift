@@ -16,7 +16,7 @@ struct FeedView: View {
 
      }*/
     //private let chatService = ChatService()
-    private let testService = TestService()
+    //private let testService = TestService()
     
     var body: some View {
         
@@ -27,7 +27,7 @@ struct FeedView: View {
                 VStack {
                     Text("")
                 }.frame(maxHeight:1)
-                .task { await testService.deleteSampleFollowingData()}
+                //.task { await testService.deleteSampleFollowingData()}
                 VStack {
                     Text("follow to customize feed")
                         .font(.headline) // Adjust font size and weight
