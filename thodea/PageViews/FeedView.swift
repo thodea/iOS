@@ -16,6 +16,7 @@ struct FeedView: View {
 
      }*/
     //private let chatService = ChatService()
+    //private let testService = TestService()
     
     var body: some View {
         
@@ -26,7 +27,7 @@ struct FeedView: View {
                 VStack {
                     Text("")
                 }.frame(maxHeight:1)
-                //.task { await chatService.createThreeSampleConversations(currentUserId: "nik")}
+                //.task { await testService.deleteSampleFollowingData()}
                 VStack {
                     Text("follow to customize feed")
                         .font(.headline) // Adjust font size and weight
@@ -327,3 +328,64 @@ class ChatService {
     }
 }
 */
+class TestService {
+    
+    func seedSampleFollowingData() async {
+        let db = Firestore.firestore()
+        let batch = db.batch()
+        let followingRef = db.collection("user").document("test").collection("following")
+        
+        // Base date: February 23, 2026 at 9:40:34 PM UTC-5
+        var dateComponents = DateComponents()
+        dateComponents.year = 2026
+        dateComponents.month = 2
+        dateComponents.day = 23
+        dateComponents.hour = 21
+        dateComponents.minute = 40
+        dateComponents.second = 34
+        dateComponents.timeZone = TimeZone(secondsFromGMT: -5 * 3600)
+        
+        let baseDate = Calendar.current.date(from: dateComponents) ?? Date()
+        
+        for i in 1...100 {
+            let docID = "\(i)"
+            let docRef = followingRef.document(docID)
+            
+            // Offset each follow date by a few minutes to create realistic pagination ordering
+            let itemDate = baseDate.addingTimeInterval(TimeInterval(-i * 60))
+            
+            let data: [String: Any] = [
+                "username": docID,
+                "followedAt": Timestamp(date: itemDate)
+            ]
+            
+            batch.setData(data, forDocument: docRef)
+        }
+        
+        do {
+            try await batch.commit()
+            print("✅ Successfully seeded 100 sample following documents!")
+        } catch {
+            print("❌ Error seeding Firestore documents: \(error.localizedDescription)")
+        }
+    }
+    
+    
+    func deleteSampleFollowingData(range: ClosedRange<Int> = 1...100) async {
+        let db = Firestore.firestore()
+        let batch = db.batch()
+        let followingRef = db.collection("user").document("test").collection("following")
+        
+        for i in range {
+            let docRef = followingRef.document("\(i)")
+            batch.deleteDocument(docRef)
+        }
+
+        do {
+            try await batch.commit()
+            print("✅ Successfully deleted test documents \(range.lowerBound) through \(range.upperBound)!")
+        } catch {
+            print("❌ Error deleting Firestore documents: \(error.localizedDescription)")
+        }
+    }
+}
