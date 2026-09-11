@@ -137,6 +137,17 @@ struct ChatsView: View {
                 if chatsViewModel.chats.isEmpty {
                     chatsViewModel.fetchChats(username: authViewModel.currentUser?.username ?? "")
                 }
+                
+                // 👈 Pointer 1: Clear flag when the view is opened or navigated back to
+                if authViewModel.currentUser?.newChat == true {
+                    authViewModel.clearNewChatNotification()
+                }
+            }
+            // 👈 Pointer 2: Catch incoming notifications while the view is already actively open
+            .onChange(of: authViewModel.currentUser?.newChat) { oldValue, newValue in
+                if newValue == true {
+                    authViewModel.clearNewChatNotification()
+                }
             }
             .toolbar{
                 ToolbarItem(placement: .principal) {
