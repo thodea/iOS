@@ -18,7 +18,7 @@ class ProfileThoughtsViewModel: ObservableObject {
     // Pagination tracking (optional but recommended for feeds)
     private var lastDocument: DocumentSnapshot?
     private let maxLimit: Int = 3
-    private let absoluteMaxLimit: Int = 10 // 🟢 ADD THIS
+    private let absoluteMaxLimit: Int = 5 // 🟢 ADD THIS
     
     /// Completed Firebase function calling translated from Next.js
     func fetchThoughts(for createdBy: String, currentUserName: String) async {

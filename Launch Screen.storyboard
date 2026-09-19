@@ -35,8 +35,12 @@
                         <constraints>
                             <constraint firstItem="n63-p8-4Gs" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="DmD-SK-dyh"/>
                             <constraint firstItem="YxL-el-iup" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="VSw-Rl-O0P"/>
-                            <constraint firstItem="n63-p8-4Gs" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Wl1-Ue-fct"/>
-                            <constraint firstItem="YxL-el-iup" firstAttribute="top" secondItem="Bcu-3y-fUS" secondAttribute="top" constant="80" id="dOb-ix-gY3" userLabel="logo.top = Safe Area.top + 200"/>
+                            <constraint firstItem="n63-p8-4Gs" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Wl1-Ue-fct">
+                                <variation key="heightClass=compact" constant="60"/>
+                            </constraint>
+                            <constraint firstItem="YxL-el-iup" firstAttribute="top" secondItem="Bcu-3y-fUS" secondAttribute="top" constant="80" id="dOb-ix-gY3" userLabel="logo.top = Safe Area.top + 200">
+                                <variation key="heightClass=compact" constant="80"/>
+                            </constraint>
                         </constraints>
                     </view>
                 </viewController>
