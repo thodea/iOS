@@ -34,6 +34,8 @@ struct ProfileBasicView: View {
     @State private var isPreviewOpen = false
     //let uploadService = UploadService(signedPostEndpoint: URL(string: "https://www.thodea.com/api/uploadURL")!)
     
+    @StateObject private var thoughtsViewModel = ProfileThoughtsViewModel()
+    
     @EnvironmentObject var bunnyService: BunnyUploadService // <--- Use the shared instance
     
     @State private var isLoading: Bool = true
@@ -55,6 +57,13 @@ struct ProfileBasicView: View {
     @State private var activeChatId: String? = nil
     @State private var isNavigatingToChat: Bool = false
     @State private var isStartingChat: Bool = false
+    
+    @State private var tabHeaderHeight: CGFloat = 0
+    
+    @State private var profileHeaderHeight: CGFloat = 0
+    @State private var scrollState = ScrollState()
+    
+    @State private var pendingTabClamp = false
     
     // 1. Reusable Messages Button Component
     private var messagesButton: some View {
@@ -189,199 +198,274 @@ struct ProfileBasicView: View {
                     .padding(.bottom, 4)
                 }
                 
-                HStack(spacing: 4) {
-                    ZStack {
-                        // Rounded rectangle with border and shadow
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(red: 17/255, green: 24/255, blue: 39/255))
-                            .frame(width: 100, height: 100)
-                            .shadow(color: Color.black.opacity(0.6), radius: 4, x: 0, y: 2)
-                            
-                        if let urlStr = isCurrentUser ? viewModel.currentUser?.profileUrl : fetchedUser?.profileUrl,
-                               let url = URL(string: urlStr) {
-                                KFImage(url)
-                                .placeholder {
-                                    ShimmerView()
-                                        .frame(width: 100, height: 100)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                .frame(width: 100, height: 100)
-                                .clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                        
-                        // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
-                        if let data = displayImageData, let uiImage = UIImage(data: data) {
-                            // Show the selected photo
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill() // Ensures photo fills the square
-                                .frame(width: 100, height: 100)
-                                .clipShape(RoundedRectangle(cornerRadius: 12)) // Clips the overflowing image
-                        } else if hasProfileUrl {
-                            // STATE B: URL exists (Loading) -> Show Transparent
-                            // This prevents the "person.fill" from flashing while waiting for download
-                            ShimmerView()
-                                .frame(width: 100, height: 100)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            
-                        } else {
-                            // STATE C: No URL exists at all -> Show Default Person Icon
-                            Image(systemName: "person.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .padding(10)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    .frame(width: 100, height: 100)
-                    .onTapGesture {
-                        if isCurrentUser {
-                            if !isNavigated {
-                                if viewModel.profileImageData == nil {
-                                    showPhotosPicker = true
-                                } else {
-                                    isImageMenuOpen = true
-                                }
-                            } else {
-                                if viewModel.profileImageData != nil {
-                                    isPreviewOpen = true
-                                }
-                            }
-                            
-                        } else {
-                            // For other users, maybe just open preview
-                            if displayImageData != nil {
-                                isPreviewOpen = true
-                            }
-                        }
-                    }
-                    
-                    
-                    VStack() {
-                        // 1. Followers Link
-                        let followersCount = abs(displayFollowers ?? 0)
-                        let hasFollowers = followersCount > 0
-                    
-                        NavigationLink(destination: FollowsView(
-                            username: username,
-                            listType: "followers",
-                            dateDisabled: false
-                        )) {
-                            HStack {
-                                Text(followerText(for: displayFollowers))
-                                    .font(.system(size: 17)).fixedSize()
-                                    .foregroundColor(.white.opacity(0.9))
-                                
-                                Spacer()
-                                
-                                HStack(spacing: 0) {
-                                    Rectangle()
-                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
-                                        .frame(height: 3)
-                                        .padding(0)
+                ScrollViewReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                            VStack(spacing: 4) {
+                                HStack(spacing: 4) {
+                                    ZStack {
+                                        // Rounded rectangle with border and shadow
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color(red: 17/255, green: 24/255, blue: 39/255))
+                                            .frame(width: 100, height: 100)
+                                            .shadow(color: Color.black.opacity(0.6), radius: 4, x: 0, y: 2)
+                                        
+                                        if let urlStr = isCurrentUser ? viewModel.currentUser?.profileUrl : fetchedUser?.profileUrl,
+                                           let url = URL(string: urlStr) {
+                                            KFImage(url)
+                                                .placeholder {
+                                                    ShimmerView()
+                                                        .frame(width: 100, height: 100)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                }
+                                                .frame(width: 100, height: 100)
+                                                .clipped()
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        }
+                                        
+                                        // 3. LOGIC TO SHOW SELECTED IMAGE OR DEFAULT ICON
+                                        if let data = displayImageData, let uiImage = UIImage(data: data) {
+                                            // Show the selected photo
+                                            Image(uiImage: uiImage)
+                                                .resizable()
+                                                .scaledToFill() // Ensures photo fills the square
+                                                .frame(width: 100, height: 100)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12)) // Clips the overflowing image
+                                        } else if hasProfileUrl {
+                                            // STATE B: URL exists (Loading) -> Show Transparent
+                                            // This prevents the "person.fill" from flashing while waiting for download
+                                            ShimmerView()
+                                                .frame(width: 100, height: 100)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                            
+                                        } else {
+                                            // STATE C: No URL exists at all -> Show Default Person Icon
+                                            Image(systemName: "person.fill")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .padding(10)
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                    .frame(width: 100, height: 100)
+                                    .onTapGesture {
+                                        if isCurrentUser {
+                                            if !isNavigated {
+                                                if viewModel.profileImageData == nil {
+                                                    showPhotosPicker = true
+                                                } else {
+                                                    isImageMenuOpen = true
+                                                }
+                                            } else {
+                                                if viewModel.profileImageData != nil {
+                                                    isPreviewOpen = true
+                                                }
+                                            }
+                                            
+                                        } else {
+                                            // For other users, maybe just open preview
+                                            if displayImageData != nil {
+                                                isPreviewOpen = true
+                                            }
+                                        }
+                                    }
                                     
-                                    Rectangle()
-                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
-                                        .frame(width: 8, height: 8, alignment: .trailing)
-                                        .padding(0)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            }
-                        }
-                        .buttonStyle(.plain) // Prevents blue text coloring
-                        .allowsHitTesting(hasFollowers)
-                        
-                        // 2. Following Link
-                        let followingCount = abs(displayFollowing ?? 0)
-                        let hasFollowing = followingCount > 0
-                
-                        NavigationLink(destination: FollowsView(
-                            username: username,
-                            listType: "following",
-                            dateDisabled: false
-                        )) {
-                            HStack {
-                                Text(followingText(for: displayFollowing))
-                                    .font(.system(size: 17)).fixedSize()
-                                    .foregroundColor(.white.opacity(0.9))
-
-                                Spacer()
-                                
-                                HStack(spacing: 0) {
-                                    Rectangle()
-                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
-                                        .frame(height: 3)
-                                        .padding(0)
                                     
-                                    Rectangle()
-                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
-                                        .frame(width: 8, height: 8, alignment: .trailing)
-                                        .padding(0)
+                                    VStack() {
+                                        // 1. Followers Link
+                                        let followersCount = abs(displayFollowers ?? 0)
+                                        let hasFollowers = followersCount > 0
+                                        
+                                        NavigationLink(destination: FollowsView(
+                                            username: username,
+                                            listType: "followers",
+                                            dateDisabled: false
+                                        )) {
+                                            HStack {
+                                                Text(followerText(for: displayFollowers))
+                                                    .font(.system(size: 17)).fixedSize()
+                                                    .foregroundColor(.white.opacity(0.9))
+                                                
+                                                Spacer()
+                                                
+                                                HStack(spacing: 0) {
+                                                    Rectangle()
+                                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
+                                                        .frame(height: 3)
+                                                        .padding(0)
+                                                    
+                                                    Rectangle()
+                                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
+                                                        .frame(width: 8, height: 8, alignment: .trailing)
+                                                        .padding(0)
+                                                }
+                                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                            }
+                                        }
+                                        .buttonStyle(.plain) // Prevents blue text coloring
+                                        .allowsHitTesting(hasFollowers)
+                                        
+                                        // 2. Following Link
+                                        let followingCount = abs(displayFollowing ?? 0)
+                                        let hasFollowing = followingCount > 0
+                                        
+                                        NavigationLink(destination: FollowsView(
+                                            username: username,
+                                            listType: "following",
+                                            dateDisabled: false
+                                        )) {
+                                            HStack {
+                                                Text(followingText(for: displayFollowing))
+                                                    .font(.system(size: 17)).fixedSize()
+                                                    .foregroundColor(.white.opacity(0.9))
+                                                
+                                                Spacer()
+                                                
+                                                HStack(spacing: 0) {
+                                                    Rectangle()
+                                                        .fill(Color(red: 2 / 255, green: 132 / 255, blue: 199 / 255))
+                                                        .frame(height: 3)
+                                                        .padding(0)
+                                                    
+                                                    Rectangle()
+                                                        .fill(Color(red: 7 / 255, green: 89 / 255, blue: 133 / 255))
+                                                        .frame(width: 8, height: 8, alignment: .trailing)
+                                                        .padding(0)
+                                                }
+                                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                            }
+                                        }
+                                        .buttonStyle(.plain) // Prevents blue text coloring
+                                        .allowsHitTesting(hasFollowing)
+                                        
+                                        if !isCurrentUser {
+                                            
+                                            let amIFollowing = fetchedUser?.isFollowing ?? false
+                                            
+                                            FollowActionRow(isFollowing: amIFollowing) {
+                                                var transaction = Transaction()
+                                                transaction.animation = nil
+                                                
+                                                withTransaction(transaction) {
+                                                    handleFollowToggle()
+                                                    //isFollowingLocal.toggle()
+                                                }
+                                            }
+                                            .disabled(isLoading)
+                                            .opacity(isLoading ? 0.5 : 1)
+                                            .frame(maxHeight: .infinity, alignment: .center)
+                                        }
+                                        
+                                    }
+                                    .padding(.leading, 12)
                                 }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .frame(maxWidth: .infinity, maxHeight: 100) // Set height for row
+                                .padding(.top, 4)
+                                .padding(.bottom, 4)
+                                
+                                if let bio = displayBio, !bio.isEmpty {
+                                    HStack {
+                                        Text(bio.toMarkdown())
+                                            .font(.system(size: 17)) // Adjust size to match styling
+                                            .foregroundColor(Color(red: 156/255, green: 163/255, blue: 175/255)) // Matches text-gray-400
+                                            .lineLimit(3) // Matches max-h-[50px] + truncate behavior
+                                            .tint(.blue)
+                                            .multilineTextAlignment(.leading)
+                                            .fixedSize(horizontal: false, vertical: true) // Ensures text wraps properly
+                                            .environment(\.openURL, OpenURLAction { url in
+                                                // We trigger the sheet by setting this variable to a new struct
+                                                webViewData = WebViewData(url: url)
+                                                return .handled
+                                            })
+                                        Spacer() // Pushes text to the left
+                                    }
+                                    .padding(.top, 6) // Matches mt-4
+                                    //.border(Color.red, width: 2)
+                                }
                             }
-                        }
-                        .buttonStyle(.plain) // Prevents blue text coloring
-                        .allowsHitTesting(hasFollowing)
-                        
-                        if !isCurrentUser {
+                            .padding(.horizontal, 16)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { profileHeaderHeight = $0 }
                             
-                            let amIFollowing = fetchedUser?.isFollowing ?? false
-                                                        
-                            FollowActionRow(isFollowing: amIFollowing) {
-                                var transaction = Transaction()
-                                transaction.animation = nil
-
-                                withTransaction(transaction) {
-                                    handleFollowToggle()
-                                    //isFollowingLocal.toggle()
+                            Color.clear
+                                .frame(height: 0)
+                                .id("tabsAnchor")
+                            
+                            Section {
+                                ZStack(alignment: .top) {
+                                    Color.clear
+                                        .containerRelativeFrame(.vertical) { height, _ in
+                                            max(0, height - tabHeaderHeight)
+                                        }
+                                        .allowsHitTesting(false)
+                                    
+                                    if selectedTab == "thoughts" {
+                                        ProfileThoughtsSectionView(
+                                            viewModel: thoughtsViewModel,
+                                            profileUsername: username,
+                                            currentLoggedUser: viewModel.currentUser?.username ?? ""
+                                        )
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 8)
+                                    } else {
+                                        Text("Coming soon...")
+                                            .frame(maxWidth: .infinity, alignment: .top)
+                                            .padding(.top, 8)
+                                    }
+                                }
+                            } header: {
+                                // --- STICKY TABS HEADER ---
+                                VStack {
+                                    HStack {
+                                        TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: displayThoughts)
+                                        TabButton(title: "loved", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
+                                        TabButton(title: "mentions", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
+                                    }
+                                    .padding(.top, bioInfo ? 9 : 12)  // Adjust the margin based on `bioInfo`
+                                    .frame(maxHeight: 50)
+                                }
+                                .id("StickyTabsHeader")
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 4)
+                                // Crucial: The background color ensures the scrollable thoughts don't bleed through the tabs!
+                                .background(Color(red: 17/255, green: 24/255, blue: 39/255))
+                                .onGeometryChange(for: CGFloat.self) { proxy in
+                                    proxy.size.height
+                                } action: { newValue in
+                                    tabHeaderHeight = newValue
                                 }
                             }
-                            .disabled(isLoading)
-                            .opacity(isLoading ? 0.5 : 1)
-                            .frame(maxHeight: .infinity, alignment: .center)
                         }
+                    }
+                    .padding(.horizontal, -16)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .defaultScrollAnchor(.top, for: .initialOffset)
+                    .onChange(of: selectedTab) { _, _ in
+                        // Only needed if we're scrolled past the point where the tabs are pinned
+                        guard scrollState.offsetY > profileHeaderHeight + 0.5 else { return }
 
+                        var t = Transaction()
+                        t.disablesAnimations = true
+                        withTransaction(t) { proxy.scrollTo("tabsAnchor", anchor: .top) }
+
+                        // Safety net in case layout lands a frame late
+                        pendingTabClamp = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { pendingTabClamp = false }
                     }
-                    .padding(.leading, 12)
-                }
-                .frame(maxWidth: .infinity, maxHeight: 100) // Set height for row
-                .padding(.top, 4)
-                .padding(.bottom, 4)
-                
-                if let bio = displayBio, !bio.isEmpty {
-                    HStack {
-                        Text(bio.toMarkdown())
-                            .font(.system(size: 17)) // Adjust size to match styling
-                            .foregroundColor(Color(red: 156/255, green: 163/255, blue: 175/255)) // Matches text-gray-400
-                            .lineLimit(3) // Matches max-h-[50px] + truncate behavior
-                            .tint(.blue)
-                            .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true) // Ensures text wraps properly
-                            .environment(\.openURL, OpenURLAction { url in
-                                // We trigger the sheet by setting this variable to a new struct
-                                webViewData = WebViewData(url: url)
-                                return .handled
-                            })
-                        Spacer() // Pushes text to the left
+                    .onScrollGeometryChange(for: ScrollMetrics.self) { geo in
+                        ScrollMetrics(
+                            offsetY: geo.contentOffset.y,
+                            maxY: max(0, geo.contentSize.height - geo.containerSize.height)
+                        )
+                    } action: { _, metrics in
+                        scrollState.offsetY = metrics.offsetY          // always track
+                        guard pendingTabClamp, metrics.offsetY > metrics.maxY + 0.5 else { return }
+                        pendingTabClamp = false                        // consume only when we actually clamp
+                        var t = Transaction()
+                        t.disablesAnimations = true
+                        withTransaction(t) { proxy.scrollTo("tabsAnchor", anchor: .top) }
                     }
-                    .padding(.top, 6) // Matches mt-4
-                    //.border(Color.red, width: 2)
+                    
                 }
-                
-                VStack {
-                    HStack {
-                        TabButton(title: "thoughts", selectedTab: $selectedTab, bioInfo: bioInfo, count: viewModel.currentUser?.thoughts ?? 0)
-                        TabButton(title: "loved", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
-                        TabButton(title: "mentions", selectedTab: $selectedTab, bioInfo: bioInfo, count: 0)
-                    }
-                    .padding(.top, bioInfo ? 2 : 4)  // Adjust the margin based on `bioInfo`
-                    .frame(maxHeight: 50)
-                }
-                
-                //.border(Color.green, width: 2)
-                Spacer()
             }
             .padding(isCurrentUser && !isNavigated ? [.all] : [.horizontal, .bottom])
             // --- ALERTS & SHEETS ---
@@ -1011,3 +1095,10 @@ struct Follow {
 }
 
 
+private struct ScrollMetrics: Equatable {
+    var offsetY: CGFloat
+    var maxY: CGFloat
+}
+
+
+private final class ScrollState { var offsetY: CGFloat = 0 }

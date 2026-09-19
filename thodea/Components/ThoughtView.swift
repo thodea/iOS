@@ -234,7 +234,7 @@ struct ThoughtView: View {
                 .stroke(Color(red: 31/255, green: 41/255, blue: 55/255), lineWidth: 1) // Border with blue color
         )
         .foregroundColor(.white) // Apply white color to all Text views
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 0)
         .padding(.vertical, 6) // Outer padding for the entire VStack
     }
 }
