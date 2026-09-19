@@ -70,7 +70,7 @@ struct ThoughtView: View {
         //Color.green.edgesIgnoringSafeArea(.all)
         VStack(alignment: .leading, spacing: 8) {
             HStack(){
-                if let imageURL = mockThought.imageURL {
+                if let imageURL = thought.imageURL {
                     ImageView(imageURL: imageURL, size: 24);
                     /*AsyncImage(url: URL(string: imageURL), transaction: Transaction(animation: .easeInOut)) { phase in
                             switch phase {

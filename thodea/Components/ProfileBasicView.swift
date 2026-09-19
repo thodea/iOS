@@ -217,7 +217,10 @@ struct ProfileBasicView: View {
                                                     ShimmerView()
                                                         .frame(width: 100, height: 100)
                                                         .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                        .contentShape(Rectangle())
                                                 }
+                                                .resizable()
+                                                .scaledToFill()
                                                 .frame(width: 100, height: 100)
                                                 .clipped()
                                                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -248,6 +251,8 @@ struct ProfileBasicView: View {
                                         }
                                     }
                                     .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))          // ← add
+                                    .contentShape(RoundedRectangle(cornerRadius: 12))
                                     .onTapGesture {
                                         if isCurrentUser {
                                             if !isNavigated {
