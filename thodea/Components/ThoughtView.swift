@@ -7,18 +7,30 @@
 
 import SwiftUI
 import SafariServices
+import FirebaseDatabase
 
 struct ThoughtView: View {
+    
+    private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
+    
     let thought: Thought
     @State private var isHeartTapped = false
     @State private var heartScale: CGFloat = 1.0
     @State private var heartColor: Color = Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255)
     @State private var showSafariView = false
     @State private var urlToOpen: URL?
+    @State private var localClickCount: Int
+
+
+    init(thought: Thought) {
+        self.thought = thought
+        _isHeartTapped = State(initialValue: thought.loved)
+        _localClickCount = State(initialValue: thought.clickCount ?? 0) // <-- ADD THIS
+    }
     
     func findURLs(in text: String) -> [String] {
-       let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-       let matches = detector?.matches(in: text, options: [], range: NSRange(text.startIndex..., in: text)) ?? []
+       let matches = Self.linkDetector?.matches(in: text, options: [], range: NSRange(text.startIndex..., in: text)) ?? []
        
        return matches.compactMap { match in
            return (text as NSString).substring(with: match.range)
@@ -29,7 +41,7 @@ struct ThoughtView: View {
     func highlightText(_ text: String) -> AttributedString {
         var attributedString = AttributedString(text)
         let urls = findURLs(in: text)
-
+        print(urls)
         for url in urls {
             if let range = attributedString.range(of: url) {
                 attributedString[range].foregroundColor = .blue
@@ -39,11 +51,11 @@ struct ThoughtView: View {
                     attributedString[range].link = url
                     //attributedString[range].link = url
                 }
-                //print( attributedString[range])
+                print( attributedString[range])
                 //print(attributedString[range])
             }
         }
-        
+        print(attributedString)
         return attributedString
     }
     
@@ -67,6 +79,8 @@ struct ThoughtView: View {
      }
     
     var body: some View {
+        //let _ = print("DEBUG message:", thought.message)
+
         //Color.green.edgesIgnoringSafeArea(.all)
         VStack(alignment: .leading, spacing: 8) {
             HStack(){
@@ -91,7 +105,7 @@ struct ThoughtView: View {
                             }
                         }*/
                 }
-                Text("\(thought.createdBy)")
+                Text(thought.profileDeleted == true ? "Deleted User" : thought.createdBy)
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255))
@@ -115,12 +129,14 @@ struct ThoughtView: View {
                 .padding(.top, 4)
                 .lineLimit(5) // Limit to 2 lines
                 .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
                 .environment(\.openURL, OpenURLAction { url in
                     // Custom action before opening URL
                     //print("Navigating to \(url)")
                     //print(url)
-                   self.urlToOpen = url
-                   self.showSafariView = true
+                    handleLinkClick() // <-- ADD THIS
+                    self.urlToOpen = url
+                    self.showSafariView = true
                     return .handled
                     //return .systemAction // Opens in system browser
                 })
@@ -139,6 +155,7 @@ struct ThoughtView: View {
                     }
                     
                 }
+                //.border(.red, width: 2)
                        
                 /*.fullScreenCover(isPresented: $showSafariView) {
                     if urlToOpen != nil {
@@ -146,10 +163,43 @@ struct ThoughtView: View {
                     }
                 }*/
             
-            if let firstUrl = thought.firstUrl {
-                Text("First URL: \(firstUrl)")
-                    .font(.footnote)
-                    .padding(.horizontal, 8) // Add inset padding
+            if thought.firstUrl != nil, (!thought.urlTitle.isEmpty || !thought.urlDescription.isEmpty) {
+                HStack(alignment: .top, spacing: 4) {
+                    Rectangle()
+                        .fill(Color(red: 30/255, green: 58/255, blue: 138/255))
+                        .frame(width: 2)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        if !thought.urlTitle.isEmpty {
+                            Text(thought.urlTitle)
+                                .font(.footnote)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        if !thought.urlDescription.isEmpty {
+                            Text(thought.urlDescription)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 8)
+                .padding(.top, 2)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if let urlString = thought.firstUrl, let url = URL(string: urlString) {
+                        handleLinkClick()
+                        self.urlToOpen = url
+                        self.showSafariView = true
+                    }
+                }
+                //.border(.green, width: 2)
             }
             
             HStack(spacing: 0){
@@ -160,19 +210,21 @@ struct ThoughtView: View {
                         .scaleEffect(heartScale) // Apply scaling effect
                         .onTapGesture {
                             if (!isHeartTapped) {
-                                heartScale = 1.1 // Scale up when tapped
-                                // Reset the scale after 0.5 seconds
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                // 1. Make it slightly larger so the fast pop is visible
+                                heartScale = 1.15
+                                
+                                // 2. Drop the delay to 0.05 (just enough to register the frame)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    
+                                    // 3. Use a fast, bouncy spring instead of easeInOut
+                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
                                         heartScale = 1.0
                                     }
                                 }
                             }
-                            isHeartTapped.toggle() // Toggle heart tapped state
-
-                            
+                            isHeartTapped.toggle()
                         }
-                    Text("\(formatNumber(thought.seenCount))")
+                    Text(formatNumber(thought.loveCount))
                         .font(.system(size: 16))
                         .fontWeight(.semibold)
                         .padding(.leading, 4)
@@ -204,6 +256,21 @@ struct ThoughtView: View {
                             .opacity(0.75)
                             .font(.system(size: 13)) // Adjust the size as
                             .padding(.leading, 4)
+                }
+                
+                if thought.firstUrl != nil {
+                    HStack(spacing: 0) {
+                        //Text("\(formatNumber(thought.clickCount ?? 0))")
+                        Text("\(formatNumber(localClickCount))")
+                            .font(.system(size: 14))
+                        
+                        Image(systemName: "link") // Apple's native chain link icon
+                            .foregroundColor(.gray)
+                            .opacity(0.75)
+                            .font(.system(size: 11, weight: .semibold)) 
+                            .padding(.leading, 4)
+                    }
+                    .padding(.leading, 12) // Gives it nice breathing room from the eye icon
                 }
             
                 Spacer()
@@ -237,4 +304,24 @@ struct ThoughtView: View {
         .padding(.horizontal, 0)
         .padding(.vertical, 6) // Outer padding for the entire VStack
     }
+    
+    private func handleLinkClick() {
+        // 1. Optimistic UI update (Instant feedback)
+        localClickCount += 1
+        
+        // 2. Database Update (Background fire-and-forget)
+        // NOTE: Replace `thought.postId` with whatever your ID property is named.
+        let ref = Database.database().reference().child("thoughts/\(thought.postId)/clicked")
+        
+        ref.runTransactionBlock({ (currentData: MutableData) -> TransactionResult in
+            let currentCount = currentData.value as? Int ?? 0
+            currentData.value = currentCount + 1
+            return TransactionResult.success(withValue: currentData)
+        }) { error, _, _ in
+            if let error = error {
+                print("Failed to update click count: \(error.localizedDescription)")
+            }
+        }
+    }
+    
 }
