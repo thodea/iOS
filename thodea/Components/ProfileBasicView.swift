@@ -486,6 +486,19 @@ struct ProfileBasicView: View {
                     //await loadUserProfile()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .userFollowInfoUpdated)) { notification in
+                guard let userInfo = notification.userInfo,
+                      let targetUsername = userInfo["username"] as? String else { return }
+                
+                // Only update if the notification is for the profile currently on this screen
+                if self.username == targetUsername {
+                    // ⭐️ THE FIX: Just pull the freshly updated data from the cache!
+                    // This prevents double-counting because the Cache already did the exact math.
+                    if let freshData = ProfileCache.shared.get(username: targetUsername) {
+                        self.fetchedUser = freshData.info
+                    }
+                }
+            }
             .sheet(item: $webViewData) { data in
                 FullScreenModalView(url: data.url)
                     .edgesIgnoringSafeArea(.all)
@@ -922,7 +935,12 @@ struct ProfileBasicView: View {
             object: nil,
             userInfo: [
                 "username": targetUser.username,
-                "change": delta
+                "change": delta,
+                "currentUsername": myUsername,
+                "targetImage": targetUser.profileMiniUrl as Any,
+                "targetFollowers": targetUser.followers as Any,
+                "currentImage": viewModel.currentUser?.profileMiniUrl as Any,
+                "currentFollowers": viewModel.currentUser?.followers as Any
             ]
         )
     

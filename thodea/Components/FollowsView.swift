@@ -24,6 +24,8 @@ class FollowListViewModel: ObservableObject {
     private let cache = FollowCache.shared
     private let pageSize = 10 // As requested
     private let maxHardLimit = 250 // 🎯 The Hard Limit
+    private var listOwnerUsername: String = ""
+   private var listType: String = ""
     
     // 1️⃣ Add Init to subscribe to the notification
     init() {
@@ -40,32 +42,54 @@ class FollowListViewModel: ObservableObject {
     
     // 2️⃣ Handle the update efficiently
     private func handleUserUpdate(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let targetUsername = userInfo["username"] as? String,
-              let change = userInfo["change"] as? Int else { return }
+           guard let userInfo = notification.userInfo,
+                 let targetUsername = userInfo["username"] as? String,
+                 let change = userInfo["change"] as? Int else { return }
 
-        // Find the index of the user in our current list
-        if let index = users.firstIndex(where: { $0.username == targetUsername }) {
-            
-            // Update the local list (Triggering UI update)
-            var updatedUser = users[index]
-            // Safely unwrap and add/subtract the change
-            let currentCount = updatedUser.followers ?? 0
-            updatedUser.followers = max(0, currentCount + change)
-            
-            self.users[index] = updatedUser
-            cache.updateFollowerCount(targetUsername: targetUsername, delta: change)
-            print("✅ ViewModel updated follower count for \(targetUsername)")
-            
-            // 3️⃣ Update the Cache too (So if we leave and come back, it's still correct)
-            // Note: You need to know which 'key' (username + listType) this current list belongs to.
-            // Since we don't store the current username/listType in the class properties in your code,
-            // strictly speaking, we are just updating the RAM cache here for consistency.
-            // If you want to be perfect, store `currentUsername` and `currentListType` in the VM class.
-        }
-    }
+           let currentUsername = userInfo["currentUsername"] as? String ?? ""
+
+           // 1. UPDATE EXISTING VISUAL COUNTS
+           if let index = users.firstIndex(where: { $0.username == targetUsername }) {
+               var updatedUser = users[index]
+               updatedUser.followers = max(0, (updatedUser.followers ?? 0) + change)
+               self.users[index] = updatedUser
+           }
+
+           // 2. HANDLE REMOVAL (UNFOLLOW)
+           if change == -1 {
+               // If I am viewing MY following list, remove the target user
+               if self.listOwnerUsername == currentUsername && self.listType == "following" {
+                   self.users.removeAll { $0.username == targetUsername }
+               }
+               // If I am viewing the TARGET's followers list, remove me
+               if self.listOwnerUsername == targetUsername && self.listType == "followers" {
+                   self.users.removeAll { $0.username == currentUsername }
+               }
+           }
+           
+           // 3. HANDLE ADDITION (FOLLOW)
+           else if change == 1 {
+               // If viewing MY following list -> Inject target user at the top
+               if self.listOwnerUsername == currentUsername && self.listType == "following" {
+                   if !self.users.contains(where: { $0.username == targetUsername }) {
+                       let newUser = ProfileUserInfo(username: targetUsername, imageURL: userInfo["targetImage"] as? String, followers: userInfo["targetFollowers"] as? Int, thoughts: 0, followedAt: Date())
+                       self.users.insert(newUser, at: 0)
+                   }
+               }
+               // If viewing TARGET's followers list -> Inject me at the top
+               if self.listOwnerUsername == targetUsername && self.listType == "followers" {
+                   if !self.users.contains(where: { $0.username == currentUsername }) {
+                       let newUser = ProfileUserInfo(username: currentUsername, imageURL: userInfo["currentImage"] as? String, followers: userInfo["currentFollowers"] as? Int, thoughts: 0, followedAt: Date())
+                       self.users.insert(newUser, at: 0)
+                   }
+               }
+           }
+       }
 
     func loadInitial(username: String, listType: String) async {
+        self.listOwnerUsername = username
+        self.listType = listType
+        
         // 🔒 Prevent reloading if we already have data
         guard !didLoadOnce else { return }
         didLoadOnce = true

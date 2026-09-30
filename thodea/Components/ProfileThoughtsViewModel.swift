@@ -20,6 +20,36 @@ class ProfileThoughtsViewModel: ObservableObject {
     private let maxLimit: Int = 3
     private let absoluteMaxLimit: Int = 5 // 🟢 ADD THIS
     
+    init() {
+            NotificationCenter.default.addObserver(
+                forName: .thoughtUpdated,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                // Run on MainActor since it modifies @Published property
+                Task { @MainActor in
+                    guard let self = self,
+                          let userInfo = notification.userInfo,
+                          let incomingPostId = userInfo["postId"],
+                          let updateType = userInfo["type"] as? String else { return }
+                    
+                    // Find if this ViewModel holds the updated post
+                    if let index = self.thoughts.firstIndex(where: { String(describing: $0.postId) == String(describing: incomingPostId) }) {
+                        
+                        if updateType == "love",
+                           let newLoved = userInfo["isHeartTapped"] as? Bool,
+                           let newCount = userInfo["loveCount"] as? Int {
+                            self.thoughts[index].loved = newLoved
+                            self.thoughts[index].loveCount = newCount
+                        } else if updateType == "click",
+                                  let newClickCount = userInfo["clickCount"] as? Int {
+                            self.thoughts[index].clickCount = newClickCount
+                        }
+                    }
+                }
+            }
+        }
+    
     /// Completed Firebase function calling translated from Next.js
     func fetchThoughts(for createdBy: String, currentUserName: String) async {
         guard !isLoading else { return }

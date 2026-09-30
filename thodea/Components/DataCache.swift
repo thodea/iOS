@@ -18,6 +18,26 @@ class FollowCache: ObservableObject {
         let lastDocument: DocumentSnapshot?
     }
     
+    private init() {
+        NotificationCenter.default.addObserver(
+            forName: .userFollowInfoUpdated,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let targetUsername = userInfo["username"] as? String,
+                  let change = userInfo["change"] as? Int else { return }
+            
+            // 👇 Extract currentUsername
+            let currentUsername = userInfo["currentUsername"] as? String ?? ""
+            
+            Task { @MainActor in
+                // 👇 Pass the full dictionary to access image/follower data
+                self?.updateFollowerCount(targetUsername: targetUsername, currentUsername: currentUsername, delta: change, userInfoDict: userInfo)
+            }
+        }
+    }
+    
     @Published var storage: [String: CachedFollowData] = [:]
     
     func get(username: String, type: String) -> CachedFollowData? {
@@ -28,17 +48,54 @@ class FollowCache: ObservableObject {
         storage["\(username)_\(type)"] = CachedFollowData(users: users, lastDocument: lastDoc)
     }
     
-    func updateFollowerCount(targetUsername: String, delta: Int) {
-        // Iterate over all cached lists to find this user and update them everywhere
+    func updateFollowerCount(targetUsername: String, currentUsername: String, delta: Int, userInfoDict: [AnyHashable: Any]) {
+        
+        // 1. Update the number integer globally (existing logic)
         for (key, data) in storage {
-            if let index = data.users.firstIndex(where: { $0.username == targetUsername }) {
-                var updatedUsers = data.users
+            var updatedUsers = data.users
+            if let index = updatedUsers.firstIndex(where: { $0.username == targetUsername }) {
                 var user = updatedUsers[index]
-                user.followers = (user.followers ?? 0) + delta
+                user.followers = max(0, (user.followers ?? 0) + delta)
                 updatedUsers[index] = user
-                
-                // Save back to storage
                 storage[key] = CachedFollowData(users: updatedUsers, lastDocument: data.lastDocument)
+            }
+        }
+        
+        // 2. Process Cached Array Removals/Additions
+        let followingKey = "\(currentUsername)_following"
+        let followersKey = "\(targetUsername)_followers"
+        
+        if delta == -1 {
+            // Unfollow -> Remove Target from Current User's 'Following'
+            if let data = storage[followingKey] {
+                var newUsers = data.users
+                newUsers.removeAll { $0.username == targetUsername }
+                storage[followingKey] = CachedFollowData(users: newUsers, lastDocument: data.lastDocument)
+            }
+            // Unfollow -> Remove Current User from Target's 'Followers'
+            if let data = storage[followersKey] {
+                var newUsers = data.users
+                newUsers.removeAll { $0.username == currentUsername }
+                storage[followersKey] = CachedFollowData(users: newUsers, lastDocument: data.lastDocument)
+            }
+        } else if delta == 1 {
+            // Follow -> Insert Target to Current User's 'Following'
+            if let data = storage[followingKey] {
+                if !data.users.contains(where: { $0.username == targetUsername }) {
+                    let newUser = ProfileUserInfo(username: targetUsername, imageURL: userInfoDict["targetImage"] as? String, followers: userInfoDict["targetFollowers"] as? Int, thoughts: 0, followedAt: Date())
+                    var newUsers = data.users
+                    newUsers.insert(newUser, at: 0)
+                    storage[followingKey] = CachedFollowData(users: newUsers, lastDocument: data.lastDocument)
+                }
+            }
+            // Follow -> Insert Current User to Target's 'Followers'
+            if let data = storage[followersKey] {
+                if !data.users.contains(where: { $0.username == currentUsername }) {
+                    let newUser = ProfileUserInfo(username: currentUsername, imageURL: userInfoDict["currentImage"] as? String, followers: userInfoDict["currentFollowers"] as? Int, thoughts: 0, followedAt: Date())
+                    var newUsers = data.users
+                    newUsers.insert(newUser, at: 0)
+                    storage[followersKey] = CachedFollowData(users: newUsers, lastDocument: data.lastDocument)
+                }
             }
         }
     }

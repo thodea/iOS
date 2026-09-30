@@ -21,12 +21,14 @@ struct ThoughtView: View {
     @State private var showSafariView = false
     @State private var urlToOpen: URL?
     @State private var localClickCount: Int
+    @State private var localLoveCount: Int
 
 
     init(thought: Thought) {
         self.thought = thought
         _isHeartTapped = State(initialValue: thought.loved)
-        _localClickCount = State(initialValue: thought.clickCount ?? 0) // <-- ADD THIS
+        _localClickCount = State(initialValue: thought.clickCount ?? 0)
+        _localLoveCount = State(initialValue: thought.loveCount)
     }
     
     func findURLs(in text: String) -> [String] {
@@ -223,8 +225,22 @@ struct ThoughtView: View {
                                 }
                             }
                             isHeartTapped.toggle()
+                            localLoveCount += isHeartTapped ? 1 : -1 // Adjust local count optimistically
+                            
+                            // BROADCAST the update
+                            NotificationCenter.default.post(
+                                name: .thoughtUpdated,
+                                object: nil,
+                                userInfo: [
+                                    "postId": thought.postId,
+                                    "type": "love",
+                                    "isHeartTapped": isHeartTapped,
+                                    "loveCount": localLoveCount
+                                ]
+                            )
+                            // TODO: Add your Firebase Database call here to actually save the "like" to the server (fire-and-forget)
                         }
-                    Text(formatNumber(thought.loveCount))
+                    Text(formatNumber(localLoveCount))
                         .font(.system(size: 16))
                         .fontWeight(.semibold)
                         .padding(.leading, 4)
@@ -303,11 +319,46 @@ struct ThoughtView: View {
         .foregroundColor(.white) // Apply white color to all Text views
         .padding(.horizontal, 0)
         .padding(.vertical, 6) // Outer padding for the entire VStack
+        .onReceive(NotificationCenter.default.publisher(for: .thoughtUpdated)) { notification in
+            guard let userInfo = notification.userInfo,
+                  let incomingPostId = userInfo["postId"],
+                  let updateType = userInfo["type"] as? String else { return }
+            
+            // Safely compare IDs (converting both to String ensures no Int vs String mismatch)
+            if String(describing: incomingPostId) == String(describing: thought.postId) {
+                
+                if updateType == "love" {
+                    if let newLoved = userInfo["isHeartTapped"] as? Bool,
+                       let newCount = userInfo["loveCount"] as? Int {
+                        // Prevent infinite loop triggers by checking if it actually differs
+                        if self.isHeartTapped != newLoved {
+                            self.isHeartTapped = newLoved
+                            self.localLoveCount = newCount
+                        }
+                    }
+                } else if updateType == "click" {
+                    if let newClickCount = userInfo["clickCount"] as? Int {
+                        self.localClickCount = newClickCount
+                    }
+                }
+            }
+        }
     }
     
     private func handleLinkClick() {
         // 1. Optimistic UI update (Instant feedback)
         localClickCount += 1
+        
+        // BROADCAST the update
+        NotificationCenter.default.post(
+            name: .thoughtUpdated,
+            object: nil,
+            userInfo: [
+                "postId": thought.postId,
+                "type": "click",
+                "clickCount": localClickCount
+            ]
+        )
         
         // 2. Database Update (Background fire-and-forget)
         // NOTE: Replace `thought.postId` with whatever your ID property is named.
