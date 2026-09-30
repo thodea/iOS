@@ -297,3 +297,8 @@ func startConversation(with targetUsername: String, currentUsername: String) asy
         return nil
     }
 }
+
+
+extension Notification.Name {
+    static let thoughtUpdated = Notification.Name("thoughtUpdated")
+}
