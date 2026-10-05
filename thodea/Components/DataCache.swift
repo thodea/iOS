@@ -139,3 +139,26 @@ class ProfileCache: ObservableObject {
         storage[username] = data
     }
 }
+
+
+@MainActor
+class ThoughtsCache: ObservableObject {
+    static let shared = ThoughtsCache()
+    
+    struct CachedThoughtsData {
+        let thoughts: [Thought]
+        let lastDocument: DocumentSnapshot?
+        let hasMore: Bool
+    }
+    
+    // Keyed by the profile's username
+    @Published private var storage: [String: CachedThoughtsData] = [:]
+    
+    func get(username: String) -> CachedThoughtsData? {
+        return storage[username]
+    }
+    
+    func save(username: String, thoughts: [Thought], lastDoc: DocumentSnapshot?, hasMore: Bool) {
+        storage[username] = CachedThoughtsData(thoughts: thoughts, lastDocument: lastDoc, hasMore: hasMore)
+    }
+}

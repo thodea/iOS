@@ -14,11 +14,12 @@ import FirebaseDatabase
 class ProfileThoughtsViewModel: ObservableObject {
     @Published var thoughts: [Thought] = []
     @Published var isLoading: Bool = false
-    
+    @Published var hasMore: Bool = true // 👈 Add this property
+
     // Pagination tracking (optional but recommended for feeds)
     private var lastDocument: DocumentSnapshot?
-    private let maxLimit: Int = 3
-    private let absoluteMaxLimit: Int = 5 // 🟢 ADD THIS
+    private let maxLimit: Int = 7 // 👈 Adjust page size (10 makes sense to reach 20 in two smooth pages)
+    private let absoluteMaxLimit: Int = 100 // 👈 The requested hard limit
     
     init() {
             NotificationCenter.default.addObserver(
@@ -45,6 +46,14 @@ class ProfileThoughtsViewModel: ObservableObject {
                                   let newClickCount = userInfo["clickCount"] as? Int {
                             self.thoughts[index].clickCount = newClickCount
                         }
+                        
+                        let profileOwner = self.thoughts[index].createdBy
+                        ThoughtsCache.shared.save(
+                            username: profileOwner,
+                            thoughts: self.thoughts,
+                            lastDoc: self.lastDocument,
+                            hasMore: self.hasMore
+                        )
                     }
                 }
             }
@@ -52,11 +61,21 @@ class ProfileThoughtsViewModel: ObservableObject {
     
     /// Completed Firebase function calling translated from Next.js
     func fetchThoughts(for createdBy: String, currentUserName: String) async {
-        guard !isLoading else { return }
+        guard !isLoading, hasMore  else { return }
         
         // 🟢 ADD THIS: Stop immediately if we've already reached 10 thoughts
-        guard thoughts.count < absoluteMaxLimit else { return }
+        guard thoughts.count < absoluteMaxLimit else {
+                self.hasMore = false
+                return
+            }
         
+        if self.thoughts.isEmpty, let cachedData = ThoughtsCache.shared.get(username: createdBy) {
+            self.thoughts = cachedData.thoughts
+            self.lastDocument = cachedData.lastDocument
+            self.hasMore = cachedData.hasMore
+            return
+        }
+    
         isLoading = true
         
         // 🟢 ADD THIS: Calculate the limit dynamically.
@@ -143,6 +162,17 @@ class ProfileThoughtsViewModel: ObservableObject {
             
             // Append to our published array to trigger UI update
             self.thoughts.append(contentsOf: fetchedThoughts)
+            
+            if self.thoughts.count >= absoluteMaxLimit || fetchedThoughts.count < fetchLimit {
+                self.hasMore = false
+            }
+    
+            ThoughtsCache.shared.save(
+                username: createdBy,
+                thoughts: self.thoughts,
+                lastDoc: self.lastDocument,
+                hasMore: self.hasMore
+            )
             
         } catch {
             print("Error fetching thoughts: \(error)")
