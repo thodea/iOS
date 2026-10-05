@@ -17,14 +17,19 @@ struct ProfileThoughtsSectionView: View {
     let currentLoggedUser: String
     
     var body: some View {
-        VStack(spacing: 5) {
+        LazyVStack(spacing: 5) {
             // 1. Render Thoughts
-            ForEach(viewModel.thoughts) { thought in
+            ForEach(Array(viewModel.thoughts.enumerated()), id: \.element.id) { index, thought in
                 ThoughtView(thought: thought)
                     .onAppear {
-                        // Optional: Trigger pagination if they scroll to the last item
-                        if thought.id == viewModel.thoughts.last?.id {
-                            Task { await viewModel.fetchThoughts(for: profileUsername, currentUserName: currentLoggedUser) }
+                        // 👈 2. Set threshold to trigger 3 items before the bottom
+                        let prefetchThreshold = max(0, viewModel.thoughts.count - 3)
+                        
+                        // 👈 3. If we cross the threshold and have more to load, trigger the fetch!
+                        if index >= prefetchThreshold && viewModel.hasMore {
+                            Task {
+                                await viewModel.fetchThoughts(for: profileUsername, currentUserName: currentLoggedUser)
+                            }
                         }
                     }
             }

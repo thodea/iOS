@@ -10,7 +10,7 @@ import SafariServices
 import FirebaseDatabase
 
 struct ThoughtView: View {
-    
+    @EnvironmentObject var authViewModel: AuthViewModel
     private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
 
     
@@ -43,7 +43,7 @@ struct ThoughtView: View {
     func highlightText(_ text: String) -> AttributedString {
         var attributedString = AttributedString(text)
         let urls = findURLs(in: text)
-        print(urls)
+        //print(urls)
         for url in urls {
             if let range = attributedString.range(of: url) {
                 attributedString[range].foregroundColor = .blue
@@ -53,11 +53,11 @@ struct ThoughtView: View {
                     attributedString[range].link = url
                     //attributedString[range].link = url
                 }
-                print( attributedString[range])
+                //print( attributedString[range])
                 //print(attributedString[range])
             }
         }
-        print(attributedString)
+        //print(attributedString)
         return attributedString
     }
     
@@ -211,34 +211,7 @@ struct ThoughtView: View {
                         .foregroundColor(isHeartTapped ? .red : Color(red: 156 / 255, green: 163 / 255, blue: 175 / 255)) // Set color based on tapped state
                         .scaleEffect(heartScale) // Apply scaling effect
                         .onTapGesture {
-                            if (!isHeartTapped) {
-                                // 1. Make it slightly larger so the fast pop is visible
-                                heartScale = 1.15
-                                
-                                // 2. Drop the delay to 0.05 (just enough to register the frame)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                    
-                                    // 3. Use a fast, bouncy spring instead of easeInOut
-                                    withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
-                                        heartScale = 1.0
-                                    }
-                                }
-                            }
-                            isHeartTapped.toggle()
-                            localLoveCount += isHeartTapped ? 1 : -1 // Adjust local count optimistically
-                            
-                            // BROADCAST the update
-                            NotificationCenter.default.post(
-                                name: .thoughtUpdated,
-                                object: nil,
-                                userInfo: [
-                                    "postId": thought.postId,
-                                    "type": "love",
-                                    "isHeartTapped": isHeartTapped,
-                                    "loveCount": localLoveCount
-                                ]
-                            )
-                            // TODO: Add your Firebase Database call here to actually save the "like" to the server (fire-and-forget)
+                            handleHeartTap()
                         }
                     Text(formatNumber(localLoveCount))
                         .font(.system(size: 16))
@@ -371,6 +344,54 @@ struct ThoughtView: View {
         }) { error, _, _ in
             if let error = error {
                 print("Failed to update click count: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func handleHeartTap() {
+        let previouslyLoved = isHeartTapped
+        if (!isHeartTapped) {
+            // 1. Make it slightly larger so the fast pop is visible
+            heartScale = 1.15
+            
+            // 2. Drop the delay to 0.05 (just enough to register the frame)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                // 3. Use a fast, bouncy spring instead of easeInOut
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                    heartScale = 1.0
+                }
+            }
+        }
+        
+        isHeartTapped.toggle()
+        localLoveCount += isHeartTapped ? 1 : -1 // Adjust local count optimistically
+        
+        // BROADCAST the update
+        NotificationCenter.default.post(
+            name: .thoughtUpdated,
+            object: nil,
+            userInfo: [
+                "postId": thought.postId,
+                "type": "love",
+                "isHeartTapped": isHeartTapped,
+                "loveCount": localLoveCount
+            ]
+        )
+        
+        // FIRE AND FORGET THE BACKEND UPDATE
+        if let currentUser = authViewModel.currentUser {
+            let username = currentUser.username
+            let email = authViewModel.userSession?.email ?? ""
+            
+            Task {
+                await ThoughtActionService.shared.toggleLove(
+                    postId: thought.postId,
+                    createdBy: thought.createdBy,
+                    postedAt: thought.createdAt,
+                    isCurrentlyLoved: previouslyLoved, // Send what it WAS before they tapped
+                    currentUsername: username,
+                    currentUserEmail: email
+                )
             }
         }
     }

@@ -199,7 +199,7 @@ struct ProfileBasicView: View {
                 }
                 
                 ScrollViewReader { proxy in
-                    ScrollView(showsIndicators: false) {
+                    ScrollView(showsIndicators: true) {
                         LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                             VStack(spacing: 4) {
                                 HStack(spacing: 4) {
