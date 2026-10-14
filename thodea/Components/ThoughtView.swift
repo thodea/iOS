@@ -8,6 +8,7 @@
 import SwiftUI
 import SafariServices
 import FirebaseDatabase
+import Kingfisher
 
 struct ThoughtView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -22,7 +23,7 @@ struct ThoughtView: View {
     @State private var urlToOpen: URL?
     @State private var localClickCount: Int
     @State private var localLoveCount: Int
-
+    @State private var previewImageURL: URL? = nil
 
     init(thought: Thought) {
         self.thought = thought
@@ -123,47 +124,43 @@ struct ThoughtView: View {
             .padding(.horizontal, 8)
             .padding(.top, 6)
             //.border(.red, width: 2)
-
-            Text(highlightText(thought.message))
-                .font(.body)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .padding(.top, 4)
-                .lineLimit(5) // Limit to 2 lines
-                .truncationMode(.tail)
-                .fixedSize(horizontal: false, vertical: true)
-                .environment(\.openURL, OpenURLAction { url in
-                    // Custom action before opening URL
-                    //print("Navigating to \(url)")
-                    //print(url)
-                    handleLinkClick() // <-- ADD THIS
-                    self.urlToOpen = url
-                    self.showSafariView = true
-                    return .handled
-                    //return .systemAction // Opens in system browser
-                })
-                .sheet(isPresented: $showSafariView) {
-                    VStack(spacing: 0) {
-                        ZStack {
-                            if self.urlToOpen != nil {
-                                FullScreenModalView(url: urlToOpen!)  // Use safely unwrapped url
-                            } /*else {
-                                Text("Invalid URL").onAppear(){
-                                    print("Invalid URL: \(String(describing: urlToOpen!))")
-
-                                }
-                            }*/
+            
+            if !thought.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                
+                Text(highlightText(thought.message))
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
+                    .lineLimit(5) // Limit to 2 lines
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .environment(\.openURL, OpenURLAction { url in
+                        // Custom action before opening URL
+                        //print("Navigating to \(url)")
+                        //print(url)
+                        handleLinkClick() // <-- ADD THIS
+                        self.urlToOpen = url
+                        self.showSafariView = true
+                        return .handled
+                        //return .systemAction // Opens in system browser
+                    })
+                    .sheet(isPresented: $showSafariView) {
+                        VStack(spacing: 0) {
+                            ZStack {
+                                if self.urlToOpen != nil {
+                                    FullScreenModalView(url: urlToOpen!)  // Use safely unwrapped url
+                                } /*else {
+                                   Text("Invalid URL").onAppear(){
+                                   print("Invalid URL: \(String(describing: urlToOpen!))")
+                                   
+                                   }
+                                   }*/
+                            }
                         }
+                        
                     }
-                    
-                }
-                //.border(.red, width: 2)
-                       
-                /*.fullScreenCover(isPresented: $showSafariView) {
-                    if urlToOpen != nil {
-                        WebView(url: urlToOpen!).edgesIgnoringSafeArea(.all)
-                    }
-                }*/
+            }
             
             if thought.firstUrl != nil, (!thought.urlTitle.isEmpty || !thought.urlDescription.isEmpty) {
                 HStack(alignment: .top, spacing: 4) {
@@ -203,6 +200,53 @@ struct ThoughtView: View {
                 }
                 //.border(.green, width: 2)
             }
+            
+            
+            if !thought.assetUrl.isEmpty, let assetURL = URL(string: thought.assetUrl) {
+                if thought.assetType.contains("video") {
+                    
+                    // Reuses the exact video component from ContentMessageView
+                    FeedVideoView(
+                        url: assetURL,
+                        posterUrl: thought.posterUrl.isEmpty ? nil : URL(string: thought.posterUrl)
+                    )
+                    .padding(.top, 4)
+                    //.frame(maxWidth: .infinity, alignment: .center) // Centers the 300x350 video nicely in a feed
+                    //.padding(.horizontal, 8)
+                    //.padding(.top, 4)
+                    
+                } else if thought.assetType.contains("image") {
+                    
+                    // Reuses Kingfisher for aggressive memory/disk caching
+                    KFImage(assetURL)
+                        .placeholder {
+                            ShimmerView() // Reuses your existing loading animation
+                                .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 350)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity, maxHeight: 350)
+                        .clipped()
+                        .cornerRadius(10)
+                        .contentShape(RoundedRectangle(cornerRadius: 10)) // Ensures the whole image is tappable
+                        .padding(.horizontal, 8)
+                        .padding(.top, 4)
+                        .onTapGesture {
+                            authViewModel.globalPreviewImage = assetURL // Pass your UIImage here
+                            authViewModel.isGlobalPreviewOpen = true
+                        }
+                }
+            }
+                //.border(.red, width: 2)
+                       
+                /*.fullScreenCover(isPresented: $showSafariView) {
+                    if urlToOpen != nil {
+                        WebView(url: urlToOpen!).edgesIgnoringSafeArea(.all)
+                    }
+                }*/
+            
+           
             
             HStack(spacing: 0){
                 HStack(spacing: 0) {

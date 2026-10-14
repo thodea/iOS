@@ -1,4 +1,5 @@
 import SwiftUI
+import Kingfisher
 
 struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
@@ -91,6 +92,52 @@ struct ContentView: View {
                 isDeleting: $authViewModel.isDeleting,
                 progress: bunnyService.progress
             )
+        }
+        .fullScreenCover(isPresented: $authViewModel.isGlobalPreviewOpen) {
+            ZStack {
+                // 1. Full-screen background (same black background)
+                Color.black.opacity(0.95)
+                    .ignoresSafeArea()
+                
+                // 2. The centered image using Kingfisher
+                if let imageURL = authViewModel.globalPreviewImage {
+                    KFImage(imageURL)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Fallback identical to your profile logic
+                    Text("No image to preview")
+                        .foregroundColor(.white)
+                        .onAppear {
+                            authViewModel.isGlobalPreviewOpen = false
+                        }
+                }
+                
+                // 3. Top-right close button (matched to your specific design)
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            authViewModel.isGlobalPreviewOpen = false
+                            authViewModel.globalPreviewImage = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.largeTitle)
+                                .foregroundColor(.blue)
+                                .foregroundStyle(.gray)
+                                .padding(2)
+                        }
+                    }
+                    Spacer()
+                }
+            }
+            // 4. Tap gesture on the whole view to close it
+            .onTapGesture {
+                authViewModel.isGlobalPreviewOpen = false
+                authViewModel.globalPreviewImage = nil
+            }
         }
         .environmentObject(authViewModel)
         .environmentObject(bunnyService) // <--- Add this here

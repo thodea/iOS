@@ -31,6 +31,9 @@ class AuthViewModel: ObservableObject {
     @Published var isUploading: Bool = false
     @Published var isDeleting: Bool = false
     
+    @Published var isGlobalPreviewOpen: Bool = false
+    @Published var globalPreviewImage: URL? = nil
+    
     private var userListener: ListenerRegistration?
     private let db = Firestore.firestore()
     
