@@ -208,7 +208,8 @@ struct ThoughtView: View {
                     // Reuses the exact video component from ContentMessageView
                     FeedVideoView(
                         url: assetURL,
-                        posterUrl: thought.posterUrl.isEmpty ? nil : URL(string: thought.posterUrl)
+                        posterUrl: thought.posterUrl.isEmpty ? nil : URL(string: thought.posterUrl),
+                        aspect: thought.assetAspect
                     )
                     .padding(.top, 4)
                     //.frame(maxWidth: .infinity, alignment: .center) // Centers the 300x350 video nicely in a feed

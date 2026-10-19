@@ -33,6 +33,7 @@ struct Thought: Identifiable {
     var urlTitle: String
     var firstUrl: String?
     var profileDeleted: Bool?
+    var assetAspect: CGFloat? = nil
 }
 
 struct User: Hashable, Codable {
@@ -153,8 +154,9 @@ struct Message: Identifiable, Hashable, Codable {
     let posterUrl: String?
     
     var bunnyVideoId: String?
-
-    
+    var videoAspect: Double?
+    var assetWidth: Int?
+    var assetHeight: Int?
     // Add these optional properties
     var attachedImage: String?
     var attachedVideoURL: URL?
@@ -170,6 +172,9 @@ struct Message: Identifiable, Hashable, Codable {
         case assetUrl
         case posterUrl
         case bunnyVideoId
+        case videoAspect
+        case assetWidth
+        case assetHeight
     }
     
     // Conformance for Hashable (needed for ScrollView logic usually)
@@ -179,6 +184,14 @@ struct Message: Identifiable, Hashable, Codable {
     
     static func == (lhs: Message, rhs: Message) -> Bool {
         return lhs.id == rhs.id
+    }
+}
+
+extension Message {
+    var resolvedAspect: Double? {
+        if let videoAspect { return videoAspect }
+        if let w = assetWidth, let h = assetHeight, h > 0 { return Double(w) / Double(h) }
+        return nil
     }
 }
 

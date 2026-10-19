@@ -14,17 +14,50 @@ import Combine
 
 struct PlayerViewController: UIViewControllerRepresentable {
     let player: AVPlayer
-    
+    @Binding var isFullScreen: Bool            // NEW
+
+    func makeCoordinator() -> Coordinator { Coordinator(isFullScreen: $isFullScreen) }   // NEW
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.player = player
-        controller.showsPlaybackControls = true
-        controller.entersFullScreenWhenPlaybackBegins = false
-        controller.exitsFullScreenWhenPlaybackEnds = true
+        controller.delegate = context.coordinator          // NEW
+        controller.showsPlaybackControls = false
         return controller
     }
-    
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
+
+    func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
+        context.coordinator.isFullScreen = $isFullScreen   // NEW (keeps binding fresh)
+    }
+
+    // NEW
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        var isFullScreen: Binding<Bool>
+        init(isFullScreen: Binding<Bool>) { self.isFullScreen = isFullScreen }
+
+        func playerViewController(_ vc: AVPlayerViewController,
+            willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            let wasPlaying = vc.player?.timeControlStatus != .paused
+            isFullScreen.wrappedValue = true
+            coordinator.animate(alongsideTransition: nil) { _ in
+                if wasPlaying { vc.player?.play() }
+            }
+        }
+
+        func playerViewController(_ vc: AVPlayerViewController,
+            willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            let wasPlaying = vc.player?.timeControlStatus != .paused
+            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+                self?.isFullScreen.wrappedValue = false
+                if wasPlaying { vc.player?.play() }
+            }
+        }
+    }
+}
+
+final class VideoPlaybackCoordinator: ObservableObject {
+    static let shared = VideoPlaybackCoordinator()
+    @Published var activeID: UUID?
 }
 
 struct ContentMessageView: View {
@@ -38,6 +71,7 @@ struct ContentMessageView: View {
     var attachedImage: String? = nil
     var attachedVideoURL: URL? = nil
     var posterLink: URL? = nil
+    var videoAspect: CGFloat? = nil
     // --------------------------------------
 
     @State private var isPreviewOpen: Bool = false // State for the preview
@@ -45,6 +79,7 @@ struct ContentMessageView: View {
     
     //@State private var isLiked: Bool = false
     @State private var heartScale: CGFloat = 1.0
+    @State private var loadedImageAspect: CGFloat? = nil
     @State private var player: AVPlayer? = nil
 
     // Computed property to format the date
@@ -87,7 +122,15 @@ struct ContentMessageView: View {
         
         return attributed
     }
-
+    
+    private var imageDisplaySize: CGSize {
+        let raw = videoAspect ?? loadedImageAspect ?? 1.0
+        let aspect = min(max(raw, 0.5), 2.0)               // clamp extreme panoramas / long screenshots
+        let maxW = UIScreen.main.bounds.width - 96         // same reserve your video uses
+        let maxH: CGFloat = 450                            // was 300 -> larger portrait photos
+        let w = min(maxW, maxH * aspect)
+        return CGSize(width: w, height: w / aspect)
+    }
 
     var body: some View {
         VStack(alignment: isCurrentUser ? .trailing : .leading) {
@@ -110,30 +153,30 @@ struct ContentMessageView: View {
 
                     // 2. UPDATE THE VIDEO ATTACHMENT CALL INSIDE THE BODY STACK:
                     if let videoURL = attachedVideoURL {
-                        MessageVideoView(url: videoURL, posterUrl: posterLink) // <-- Pass it here
+                        MessageVideoView(url: videoURL, posterUrl: posterLink, videoAspect: videoAspect) // <-- Pass it here
                             .padding(.bottom, 2)
                     }
                     
                     // 2. IMAGE ATTACHMENT
                     else if let urlStr = attachedImage, let url = URL(string: urlStr) {
+                        let size = imageDisplaySize
                         KFImage(url)
                             .placeholder {
                                 ShimmerView()
-                                    .frame(minWidth: 125, minHeight: 125)
-                                    .frame(maxHeight: 300)
+                                    .frame(width: size.width, height: size.height)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .onSuccess { result in
+                                let s = result.image.size
+                                if s.width > 0, s.height > 0 { loadedImageAspect = s.width / s.height }
                             }
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(minWidth: 125, minHeight: 125)
-                            .frame(maxHeight: 300)
-                            .clipped() // Keeps it visually contained
+                            .frame(width: size.width, height: size.height)
+                            .clipped()
                             .cornerRadius(10)
-                            // 👇 THE FIX: Define the hit-test shape to match the frame
                             .contentShape(RoundedRectangle(cornerRadius: 10))
-                            .onTapGesture {
-                                isPreviewOpen = true
-                            }
+                            .onTapGesture { isPreviewOpen = true }
                             .padding(.bottom, 2)
                     }
                     
@@ -252,11 +295,30 @@ struct ContentMessageView: View {
 struct MessageVideoView: View {
     let url: URL
     let posterUrl: URL?
-    
+    init(url: URL, posterUrl: URL?, videoAspect: CGFloat? = nil) {
+        self.url = url
+        self.posterUrl = posterUrl
+        _aspect = State(initialValue: videoAspect ?? 300.0 / 350.0)
+    }
     @State private var player = AVPlayer()
     @State private var isPlaying = false
     @State private var isAssetPrimed = false
     @State private var showBufferingSpinner = false
+    @State private var aspect: CGFloat = 300.0 / 350.0
+    @State private var isFullScreen = false                        // NEW
+    @State private var isMuted = false
+    @State private var muteCancellable: AnyCancellable?
+    @State private var isPaused = false
+    @State private var timeControlCancellable: AnyCancellable?
+    @State private var instanceID = UUID()
+    
+    private var videoSize: CGSize {
+        // 96 = row padding 32 + side padding 30 + heart ~23 + HStack spacing 8 + 3 safety
+        let maxW = min(300, UIScreen.main.bounds.width - 96)
+        let maxH: CGFloat = 350
+        let w = min(maxW, maxH * aspect)
+        return CGSize(width: w, height: w / aspect)
+    }
     
     // --- NEW: Processing States ---
     enum MediaStatus {
@@ -271,17 +333,13 @@ struct MessageVideoView: View {
         ZStack {
             if isPlaying {
                 // --- STATE 1: ACTIVE VIDEO CONTAINER LAYER ---
-                PlayerViewController(player: player)
-                    .frame(width: 300, height: 350)
+                PlayerViewController(player: player, isFullScreen: $isFullScreen)
+                    .frame(width: videoSize.width, height: videoSize.height)
                     .cornerRadius(10)
                     .transition(.opacity)
-                
-                // Overlay clean loading indicator if CDN network experiences buffer hiccups
-                if showBufferingSpinner {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(1.5)
-                }
+                    .overlay { controls(fullscreen: false) }
+                    .contentShape(Rectangle())
+                    .onTapGesture { togglePlayback() }
             } else {
                 // --- STATE 2: PRISTINE CACHED IDLE POSTER LAYER ---
                 ZStack {
@@ -294,23 +352,29 @@ struct MessageVideoView: View {
                                 return securedRequest
                             })
                             .retry(maxCount: 20, interval: .seconds(3))
+                            .onSuccess { result in
+                                let s = result.image.size
+                                if s.width > 0, s.height > 0 { aspect = s.width / s.height }
+                            }
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(maxHeight: 350)
+                            .frame(width: videoSize.width, height: videoSize.height)
                             .clipped()
                             .contentShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(
-                                Color.clear
-                                    .background(.ultraThinMaterial)
-                                    .opacity(0.2)
-                            )
-                            .overlay(mediaStatus == .processing ? Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2) : Color.black.opacity(0.15))
+                            .overlay {
+                                if mediaStatus == .processing {
+                                    ZStack {
+                                        Color.clear.background(.ultraThinMaterial).opacity(0.2)
+                                        Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2)
+                                    }
+                                }
+                            }
                             .background(mediaStatus == .processing ? Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2) : Color(red: 23/255, green: 23/255, blue: 23/255))
                             .cornerRadius(10)
                             //.id(mediaStatus)
                     } else {
                         Color(mediaStatus == .processing ? Color(red: 23/255, green: 37/255, blue: 84/255).opacity(0.2) : Color(red: 23/255, green: 23/255, blue: 23/255))
-                            .frame(width: 300, height: 350)
+                            .frame(width: videoSize.width, height: videoSize.height)
                             .cornerRadius(10)
                     }
                     
@@ -331,22 +395,55 @@ struct MessageVideoView: View {
                         .cornerRadius(12)
                     } else {
                         // Centered Floating Play Action Button Trigger
-                        Image(systemName: "play.circle.fill")
-                            .font(.system(size: 70))
-                            .foregroundColor(.white.opacity(0.9))
-                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
-                            .onTapGesture { play() }
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .offset(x: 1.5) // optical centering, the triangle looks left-heavy otherwise
+                            .frame(width: 44, height: 44)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.5))
+                            .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
                     }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { if mediaStatus == .ready { play() } }
                 .transition(.opacity)
             }
         }
         .onAppear {
             primeVideoAsset()
+            muteCancellable = player.publisher(for: \.isMuted)
+                .receive(on: DispatchQueue.main)
+                .sink { isMuted = $0 }
+            timeControlCancellable = player.publisher(for: \.timeControlStatus)
+                .receive(on: DispatchQueue.main)
+                .sink { status in
+                    isPaused = (status == .paused)
+                    showBufferingSpinner = (status == .waitingToPlayAtSpecifiedRate)
+                }
         }
         .onDisappear {
+            guard !isFullScreen else { return }                        // NEW
             pause()
-            playerStatusCancellable?.cancel() // Cleanup observer
+            playerStatusCancellable?.cancel()
+            muteCancellable?.cancel()
+            timeControlCancellable?.cancel()
+        }
+        .onReceive(VideoPlaybackCoordinator.shared.$activeID) { id in
+            if id != instanceID, isPlaying { pause() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime).receive(on: DispatchQueue.main)) { note in
+            guard let item = note.object as? AVPlayerItem, item === player.currentItem else { return }
+            player.seek(to: .zero)
+        }
+        .fullScreenCover(isPresented: $isFullScreen) {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                PlayerViewController(player: player, isFullScreen: $isFullScreen).ignoresSafeArea()
+                controls(fullscreen: true)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { togglePlayback() }
         }
     }
     
@@ -372,14 +469,9 @@ struct MessageVideoView: View {
                     self.pollForReadiness()
                 }
             }
-        
+        player.actionAtItemEnd = .none
         player.replaceCurrentItem(with: playerItem)
         isAssetPrimed = true
-        
-        // Listen to native pipeline buffer underflow state modifications
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemPlaybackStalled, object: playerItem, queue: .main) { _ in
-            showBufferingSpinner = true
-        }
     }
     
     // --- NEW: Polling Logic ---
@@ -417,10 +509,19 @@ struct MessageVideoView: View {
     // ----------------------------
     
     private func play() {
+        // Step A: set the audio session before playback starts
+        VideoPlaybackCoordinator.shared.activeID = instanceID
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        try? AVAudioSession.sharedInstance().setActive(true)
+
         withAnimation(.easeInOut(duration: 0.25)) {
             isPlaying = true
         }
+        isPaused = false
         player.play()
+
+        // Step B: temporary diagnostic, remove after testing
+        print("🔊 isMuted=\(player.isMuted) volume=\(player.volume) category=\(AVAudioSession.sharedInstance().category.rawValue)")
     }
     
     private func pause() {
@@ -429,6 +530,60 @@ struct MessageVideoView: View {
         }
         player.pause()
     }
+    
+    private func controlButton(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 32, height: 32)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+    }
+
+    @ViewBuilder
+    private func controls(fullscreen: Bool) -> some View {
+        ZStack {
+            Group {
+                if showBufferingSpinner {
+                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white)).scaleEffect(1.5)
+                } else if isPaused {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .bold)).foregroundColor(.white)
+                        .offset(x: 1.5).frame(width: 44, height: 44)
+                        .background(.ultraThinMaterial, in: Circle())
+                }
+            }
+            .allowsHitTesting(false)
+
+            VStack {
+                HStack {
+                    if fullscreen { controlButton("xmark") { isFullScreen = false } }
+                    Spacer()
+                    controlButton(isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill") { player.isMuted.toggle() }
+                }
+                Spacer()
+                if !fullscreen {
+                    HStack { Spacer(); controlButton("arrow.up.left.and.arrow.down.right") { isFullScreen = true } }
+                }
+            }
+            .padding(.horizontal, fullscreen ? 16 : 8)
+            .padding(.top, fullscreen ? 22 : 8)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private func togglePlayback() {
+        if player.timeControlStatus == .paused {
+            if let item = player.currentItem, item.duration.isNumeric, item.currentTime() >= item.duration {
+                player.seek(to: .zero)          // replay after the video ended
+            }
+            player.play()
+        } else {
+            player.pause()
+        }
+    }
+    
 }
 
 // MARK: - Update Preview to Test

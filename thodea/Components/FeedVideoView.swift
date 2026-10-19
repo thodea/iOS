@@ -5,7 +5,8 @@ import Kingfisher
 
 final class FeedVideoModel: ObservableObject {
     @Published private(set) var player: AVPlayer?
-    @Published private(set) var aspect: CGFloat = 1.0
+    @Published private(set) var videoAspect: CGFloat = 1.0          // real w/h, unclamped
+    var aspect: CGFloat { min(max(videoAspect, Self.minAspect), Self.maxAspect) }   // what the cell uses
     @Published private(set) var hasStartedPlaying = false
     @Published private(set) var isBuffering = false
     @Published private(set) var isProcessing = false
@@ -13,13 +14,19 @@ final class FeedVideoModel: ObservableObject {
     
     private let url: URL
     private static let headers = ["Referer": "https://www.thodea.com", "User-Agent": "MobileAppClient/1.0"]
+    private static let maxAspect: CGFloat = 2.4   // covers 2.39:1 cinemascope
+    private static let minAspect: CGFloat = 0.8        // 4:5
+    private static let fillTolerance: CGFloat = 20
     private var asset: AVURLAsset?
     private var bag = Set<AnyCancellable>()
     private var pollTask: Task<Void, Never>?
     private var wantsPlay = false
     private var muted = true
 
-    init(url: URL) { self.url = url }
+    init(url: URL, aspect: CGFloat? = nil) {
+        self.url = url
+        if let aspect, aspect > 0 { self.videoAspect = aspect }
+    }
 
     private func makeAsset() -> AVURLAsset {
         AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": Self.headers])
@@ -36,13 +43,29 @@ final class FeedVideoModel: ObservableObject {
                 let (size, tf) = try await track.load(.naturalSize, .preferredTransform)
                 let s = size.applying(tf)
                 guard s.width != 0, s.height != 0 else { return }
-                self?.aspect = min(max(abs(s.width / s.height), 0.8), 16.0 / 9.0)  // clamp 4:5 … 16:9
+                self?.setVideoSize(s)
             } catch {
                 self?.enterProcessing()
             }
         }
     }
+    
+    private func setVideoSize(_ s: CGSize) {
+        let w = abs(s.width), h = abs(s.height)
+        guard w > 0, h > 0 else { return }
+        let r = w / h
+        if abs(r - videoAspect) > 0.001 { videoAspect = r }    // avoid needless re-layout
+    }
 
+    /// true = crop to fill (no bars). Only when leftover bars would be ≤ fillTolerance.
+    func fills(width w: CGFloat) -> Bool {
+        guard w > 0 else { return false }
+        let cellH = w / aspect
+        let bars = videoAspect > aspect ? cellH - w / videoAspect   // top/bottom bars (very wide)
+                                        : w - cellH * videoAspect   // side bars (very tall)
+        return bars <= Self.fillTolerance
+    }
+    
     func setPlaying(_ play: Bool) { wantsPlay = play; applyPlayback() }
 
     func togglePause() { userPaused.toggle(); applyPlayback() }
@@ -81,6 +104,10 @@ final class FeedVideoModel: ObservableObject {
             .sink { [weak self] in if $0 == .failed { self?.enterProcessing() } }
             .store(in: &bag)
 
+        item.publisher(for: \.presentationSize).receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.setVideoSize($0) }
+            .store(in: &bag)
+        
         p.publisher(for: \.timeControlStatus).receive(on: DispatchQueue.main)
             .sink { [weak self] status in
                 guard let self else { return }
@@ -140,14 +167,16 @@ struct FeedVideoView: View {
     @StateObject private var model: FeedVideoModel
     @ObservedObject private var manager = FeedVideoManager.shared
     @State private var showFullScreen = false
-
-    init(url: URL, posterUrl: URL?) {
+    @State private var cellWidth: CGFloat = 0
+    
+    init(url: URL, posterUrl: URL?, aspect: CGFloat? = nil) {
         self.url = url
         self.posterUrl = posterUrl
-        _model = StateObject(wrappedValue: FeedVideoModel(url: url))
+        _model = StateObject(wrappedValue: FeedVideoModel(url: url, aspect: aspect))
     }
 
     private var shouldPlay: Bool { manager.playingIDs.contains(id) }
+    private var fillsCell: Bool { model.fills(width: cellWidth) }
     private var hasAudio: Bool { manager.soundEnabled && manager.audioVideoID == id }
 
     var body: some View {
@@ -156,7 +185,8 @@ struct FeedVideoView: View {
             .aspectRatio(model.aspect, contentMode: .fit)          // sizes the cell; overlays don't affect layout
             .background(GeometryReader { geo in
                 Color.clear
-                    .onAppear { manager.report(id: id, frame: geo.frame(in: .global)) }
+                    .onAppear { cellWidth = geo.size.width; manager.report(id: id, frame: geo.frame(in: .global)) }
+                    .onChange(of: geo.size.width) { _, w in cellWidth = w }
                     .onChange(of: geo.frame(in: .global)) { _, f in manager.report(id: id, frame: f) }
             })
             .overlay { mediaLayers }
@@ -196,11 +226,12 @@ struct FeedVideoView: View {
                         return r
                     })
                     .retry(maxCount: 20, interval: .seconds(3))
-                    .resizable().scaledToFill()
+                    .resizable().aspectRatio(contentMode: fillsCell ? .fill : .fit)
                     .allowsHitTesting(false)
             }
             if let p = model.player {
-                PlayerLayerRepresentable(player: p).allowsHitTesting(false)
+                PlayerLayerRepresentable(player: p, gravity: fillsCell ? .resizeAspectFill : .resizeAspect)
+                        .allowsHitTesting(false)
             }
             if model.isProcessing {
                 VStack(spacing: 10) {

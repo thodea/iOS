@@ -171,7 +171,8 @@ struct UserChatView: View {
                 },
                 attachedImage: (msg.assetType?.hasPrefix("image") ?? false) ? msg.assetUrl : nil,
                 attachedVideoURL: (msg.assetType?.hasPrefix("video") ?? false) ? URL(string: msg.assetUrl ?? "") : nil,
-                posterLink: msg.posterUrl.flatMap { URL(string: $0) }
+                posterLink: msg.posterUrl.flatMap { URL(string: $0) },
+                videoAspect: msg.resolvedAspect.map { CGFloat($0) }
             )
             .frame(maxWidth: .infinity, alignment: isCurrentUser ? .trailing : .leading)
             .padding(.horizontal)
@@ -200,6 +201,26 @@ struct UserChatView: View {
             warningTimer = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: workItem)
         }
+    }
+    
+    private func videoDimensions(of url: URL) async -> (width: Int, height: Int)? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let (size, transform) = try? await track.load(.naturalSize, .preferredTransform)
+        else { return nil }
+        let r = size.applying(transform)          // respects portrait rotation
+        let w = abs(r.width), h = abs(r.height)
+        guard w.isFinite, h.isFinite, w >= 1, h >= 1 else { return nil }
+        return (Int(w.rounded()), Int(h.rounded()))
+    }
+    
+    private func videoAspectRatio(of url: URL) async -> Double? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let (size, transform) = try? await track.load(.naturalSize, .preferredTransform)
+        else { return nil }
+        let r = size.applying(transform)   // respects portrait rotation
+        return r.height == 0 ? nil : Double(abs(r.width) / abs(r.height))
     }
 
     private var messageInputBar: some View {
@@ -269,11 +290,15 @@ struct UserChatView: View {
                                 var finalAssetUrl: String? = nil
                                 var assetFileType: String? = nil
                                 var bunnyVideoId: String? = nil // <--- ADD THIS
+                                var videoAspect: Double? = nil
+                                var assetWidth: Int? = nil
+                                var assetHeight: Int? = nil
                                 var posterUrl: String? = nil    // <--- ADD THIS
                                 
                                 // 1. If an image is selected, process and upload it first
                                 if let uiImage = selectedImage {
                                     viewModel.isUploading = true
+                                    if uiImage.size.height > 0 { videoAspect = Double(uiImage.size.width / uiImage.size.height) }
                                     guard let compressedData = uiImage.jpegData(compressionQuality: 0.80) else {
                                         print("🔥 Image compression failed.")
                                         return
@@ -294,9 +319,14 @@ struct UserChatView: View {
                                 } else if let videoURL = selectedVideoURL {
                                     // --- NEW VIDEO UPLOAD INTEGRATION ROUTE ---
                                     viewModel.isUploading = true
-                                    
+                                    if let dims = await videoDimensions(of: videoURL) {
+                                        assetWidth = dims.width
+                                        assetHeight = dims.height
+                                        videoAspect = Double(dims.width) / Double(dims.height)   // keep existing field working
+                                    }
                                     // Upload utilizing the local sandbox path provided by your Transferable struct
-                                    if let videoMeta = try await bunnyService.uploadVideo(fileURL: videoURL, collectionName: chatId) {
+                                    if let videoMeta = try await
+                                        bunnyService.uploadVideo(fileURL: videoURL, collectionName: chatId) {
                                         finalAssetUrl = videoMeta.cdnUrl // The direct .m3u8 index stream route
                                         let ext = videoURL.pathExtension.lowercased()
                                         assetFileType = "video/\(ext == "mov" ? "mp4" : ext)"
@@ -319,7 +349,10 @@ struct UserChatView: View {
                                     assetType: assetFileType,
                                     bunnyVideoId: bunnyVideoId, // <--- ADD THIS
                                     posterUrl: posterUrl,
-                                    chat: chat
+                                    chat: chat,
+                                    videoAspect: videoAspect,
+                                    assetWidth: assetWidth,
+                                    assetHeight: assetHeight
                                 )
                                 
                                 // 3. UI Cleanup on Main Actor upon successful delivery
@@ -379,6 +412,7 @@ struct UserChatView: View {
                                 // 3. Make the thumbnail tappable
                                 .onTapGesture {
                                     print("[DEBUG] Opening video player for \(videoURL)")
+                                    VideoPlaybackCoordinator.shared.activeID = UUID()
                                     playableVideo = PlayableVideo(url: videoURL)
                                 }
                         }
@@ -679,7 +713,8 @@ class ChatViewModel: ObservableObject {
     private var convoListener: ListenerRegistration?
     @Published var realTimeMessages: [Message] = []
     @Published var isLoading: Bool = true
-    
+    private var liveAllAccepted: Bool?
+    private var liveStartedBy: String?
     private var db = Firestore.firestore()
     private var listener: ListenerRegistration?
     let chatId: String
@@ -742,11 +777,14 @@ class ChatViewModel: ObservableObject {
             .document(chatId)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let data = snapshot?.data() else { return }
-                
+                let rawAllAccepted = data["allAccepted"] as? Bool
+                let rawStartedBy = data["startedBy"] as? String
                 let allAccepted = data["allAccepted"] as? Bool ?? true
                 let startedBy = data["startedBy"] as? String ?? ""
                 
                 DispatchQueue.main.async {
+                    self?.liveAllAccepted = rawAllAccepted
+                    self?.liveStartedBy = rawStartedBy
                     // Next.js equivalent: convoData?.allAccepted == false && convoData?.startedBy == userName!
                     if allAccepted == false && startedBy == currentUsername {
                         self?.requestPendingError = true
@@ -947,12 +985,11 @@ class ChatViewModel: ObservableObject {
         convoListener?.remove()
     }
     
-    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil, bunnyVideoId: String? = nil, posterUrl: String? = nil, chat: Chat? = nil
+    func sendMessage(messageId: String, input: String, userName: String, assetUrl: String? = nil, assetType: String? = nil, bunnyVideoId: String? = nil, posterUrl: String? = nil, chat: Chat? = nil, videoAspect: Double? = nil, assetWidth: Int? = nil, assetHeight: Int? = nil
         ) async throws {
         // 1. References for the parent conversation and the nested messages sub-collection
         let conversationDocRef = db.collection("conversation").document(chatId)
         let messagesCollection = conversationDocRef.collection("messages")
-        
         // Create a new document reference with an auto-generated ID (offline-ready)
         //let newMessageDocRef = messagesCollection.document()
         let newMessageDocRef = messagesCollection.document(messageId)
@@ -966,7 +1003,11 @@ class ChatViewModel: ObservableObject {
             "messagedAt": now,
             "loved": false
         ]
-        
+        if let videoAspect { messageData["videoAspect"] = videoAspect }
+        if let assetWidth, let assetHeight {          // mirrors: ...(videoDims && { assetWidth, assetHeight })
+            messageData["assetWidth"] = assetWidth
+            messageData["assetHeight"] = assetHeight
+        }
         // Dynamic payload matching: ...(finalAssetUrl && { assetUrl, assetType })
         if let assetUrl = assetUrl, let assetType = assetType {
             messageData["assetUrl"] = assetUrl
@@ -995,9 +1036,10 @@ class ChatViewModel: ObservableObject {
         
         if let chat = chat {
             let otherTargetUser = chat.otherUser(currentUsername: userName)
-            
+            let effectiveAllAccepted = liveAllAccepted ?? chat.allAccepted
+            let effectiveStartedBy   = liveStartedBy   ?? chat.startedBy
             // Condition 1: Initializing a New Chat (startedBy is not set yet)
-            if chat.startedBy == nil || chat.startedBy?.isEmpty == true {
+            if effectiveStartedBy == nil || effectiveStartedBy?.isEmpty == true {
                 conversationUpdateData["allAccepted"] = false
                 conversationUpdateData["startedBy"] = userName
                 conversationUpdateData["acceptedBy"] = [userName]
@@ -1009,9 +1051,9 @@ class ChatViewModel: ObservableObject {
                 }
             }
             // Condition 2: Accepting a chat request (started by the other user)
-            else if chat.allAccepted == false && chat.startedBy != userName {
+            else if effectiveAllAccepted == false && effectiveStartedBy != userName {
                 conversationUpdateData["allAccepted"] = true
-                if let originalStarter = chat.startedBy {
+                if let originalStarter = effectiveStartedBy {
                     conversationUpdateData["acceptedBy"] = [userName, originalStarter]
                 } else {
                     conversationUpdateData["acceptedBy"] = [userName]
@@ -1023,7 +1065,7 @@ class ChatViewModel: ObservableObject {
                 }
             }
             // Condition 3: Normal Ongoing Chat
-            else if chat.allAccepted == true {
+            else if effectiveAllAccepted == true {
                 if otherTargetUser != "~unknown" {
                     let userDocRef = db.collection("user").document(otherTargetUser)
                     batch.updateData(["newChat": true], forDocument: userDocRef)
