@@ -122,7 +122,11 @@ class ProfileThoughtsViewModel: ObservableObject {
                         let commentsCount = (try? await commentsSnap)?.value as? Int ?? 0
                         let clicksCount = (try? await clicksSnap)?.value as? Int ?? 0
                         let seenRaw = (try? await seenSnap)?.value as? Int ?? 0
-                        
+                        var aspect: CGFloat? = nil
+                        if let w = (data["assetWidth"] as? NSNumber)?.doubleValue,
+                           let h = (data["assetHeight"] as? NSNumber)?.doubleValue, w > 0, h > 0 {
+                            aspect = CGFloat(w / h)
+                        }
                         // 4. Construct the Thought model
                         return Thought(
                             createdAt: (data["createdAt"] as? Timestamp)?.dateValue(),
@@ -145,7 +149,8 @@ class ProfileThoughtsViewModel: ObservableObject {
                             urlDescription: data["urlDescription"] as? String ?? "",
                             urlTitle: data["urlTitle"] as? String ?? "",
                             firstUrl: data["firstUrl"] as? String,
-                            profileDeleted: profileSnap?.data()?["deleted"] as? Bool
+                            profileDeleted: profileSnap?.data()?["deleted"] as? Bool,
+                            assetAspect: aspect
                         )
                     }
                 }
