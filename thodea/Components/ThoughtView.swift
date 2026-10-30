@@ -79,7 +79,13 @@ struct ThoughtView: View {
              }
          }
          return "Unknown time"
-     }
+    }
+    
+    private var imageRatio: CGFloat {
+        let raw = CGFloat(thought.assetAspect ?? 0)   // adapt if optional / see note below
+        guard raw > 0 else { return 4.0 / 5.0 }  // fallback if no aspect stored
+        return min(max(raw, 9.0 / 16.0), 1.91)
+    }
     
     var body: some View {
         //let _ = print("DEBUG message:", thought.message)
@@ -125,9 +131,9 @@ struct ThoughtView: View {
             .padding(.top, 6)
             //.border(.red, width: 2)
             
-            if !thought.message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                
-                Text(highlightText(thought.message))
+            let message = thought.message.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !message.isEmpty {
+                Text(highlightText(message))
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 8)
@@ -221,20 +227,21 @@ struct ThoughtView: View {
                     // Reuses Kingfisher for aggressive memory/disk caching
                     KFImage(assetURL)
                         .placeholder {
-                            ShimmerView() // Reuses your existing loading animation
-                                .frame(maxWidth: .infinity, minHeight: 200, maxHeight: 350)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            ShimmerView()
+                                .frame(maxWidth: .infinity) // 🪄 1. Stretches to fill the entire width
+                                .aspectRatio(1.0, contentMode: .fill) 
                         }
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity, maxHeight: 350)
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(maxHeight: UIScreen.main.bounds.width * (16.0 / 9.0)) // 🪄 NEW: Caps height exactly to the 9:16 video max
                         .clipped()
                         .cornerRadius(10)
-                        .contentShape(RoundedRectangle(cornerRadius: 10)) // Ensures the whole image is tappable
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
                         .padding(.horizontal, 8)
                         .padding(.top, 4)
                         .onTapGesture {
-                            authViewModel.globalPreviewImage = assetURL // Pass your UIImage here
+                            authViewModel.globalPreviewImage = assetURL
                             authViewModel.isGlobalPreviewOpen = true
                         }
                 }

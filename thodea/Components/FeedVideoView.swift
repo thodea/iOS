@@ -15,7 +15,7 @@ final class FeedVideoModel: ObservableObject {
     private let url: URL
     private static let headers = ["Referer": "https://www.thodea.com", "User-Agent": "MobileAppClient/1.0"]
     private static let maxAspect: CGFloat = 2.4   // covers 2.39:1 cinemascope
-    private static let minAspect: CGFloat = 0.8        // 4:5
+    private static let minAspect: CGFloat = 9.0 / 16.0        // 4:5
     private static let fillTolerance: CGFloat = 20
     private var asset: AVURLAsset?
     private var bag = Set<AnyCancellable>()
@@ -37,6 +37,7 @@ final class FeedVideoModel: ObservableObject {
         guard asset == nil else { return }
         let a = makeAsset()
         asset = a
+        buildPlayer()
         Task { @MainActor [weak self] in
             do {
                 guard let track = try await a.loadTracks(withMediaType: .video).first else { return }
@@ -176,7 +177,7 @@ struct FeedVideoView: View {
     }
 
     private var shouldPlay: Bool { manager.playingIDs.contains(id) }
-    private var fillsCell: Bool { model.fills(width: cellWidth) }
+    private var fillsCell: Bool { true }   
     private var hasAudio: Bool { manager.soundEnabled && manager.audioVideoID == id }
 
     var body: some View {
@@ -190,7 +191,7 @@ struct FeedVideoView: View {
                     .onChange(of: geo.frame(in: .global)) { _, f in manager.report(id: id, frame: f) }
             })
             .overlay { mediaLayers }
-            .overlay(alignment: .bottomTrailing) { if model.player != nil { speakerButton } }
+            .overlay(alignment: .bottomTrailing) { if model.hasStartedPlaying { speakerButton } }
             .clipped()
             .contentShape(Rectangle())
             .onTapGesture { openFullScreen() }
@@ -240,8 +241,6 @@ struct FeedVideoView: View {
                 }
                 .foregroundColor(.white).padding(16)
                 .background(Color(white: 0.15), in: RoundedRectangle(cornerRadius: 12))
-            } else if model.isBuffering {
-                ProgressView().tint(.white)
             }
             /*if model.userPaused {
                 Image(systemName: "play.circle.fill")
@@ -264,7 +263,7 @@ struct FeedVideoView: View {
     }
 
     private func openFullScreen() {
-        guard model.player != nil else { return }
+        guard model.hasStartedPlaying else { return }
         manager.setFullScreen(id)
         showFullScreen = true
     }
