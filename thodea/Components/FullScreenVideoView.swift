@@ -82,7 +82,8 @@ struct FullScreenVideoView: View {
         Image(systemName: name)
             .font(.system(size: 18, weight: .semibold)).foregroundColor(.white)
             .frame(width: 40, height: 40)
-            .background(Color.white.opacity(0.18), in: Circle())
+            .background(Color.black.opacity(0.6), in: Circle())
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
     }
 
     private func format(_ t: Double) -> String {
